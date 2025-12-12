@@ -15,8 +15,7 @@ export default function Envios() {
     const { data, refetch } = useQuery({
         queryKey: ['solicitudes-envios'],
         queryFn: async () => {
-            // Filter by 'pendiente_envio' or 'revisado' (optional per requirements)
-            // Requirement says: "Mostrar SOLO solicitudes con status pendiente_envio"
+            // Mostrar solicitudes listas para envío
             const { data, error } = await supabase
                 .from('solicitudes')
                 .select('*')

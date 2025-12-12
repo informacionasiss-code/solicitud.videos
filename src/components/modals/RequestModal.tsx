@@ -23,6 +23,16 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
     const handleSubmit = async (values: RequestFormValues) => {
         try {
             setLoading(true)
+
+            // Auto-update status logic
+            let newStatus = request.status;
+            if (values.video_url && values.video_url !== request.video_url) {
+                if (['pendiente', 'en_revision'].includes(request.status)) {
+                    newStatus = 'pendiente_envio';
+                    toast.info("Estado actualizado a: Pendiente de Envío");
+                }
+            }
+
             const { error } = await supabase
                 .from('solicitudes')
                 .update({
@@ -35,7 +45,8 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
                     detail: values.detail,
                     video_url: values.video_url,
                     video_url_uploaded_at: (values.video_url && values.video_url !== request.video_url) ? new Date().toISOString() : request.video_url_uploaded_at,
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
+                    status: newStatus
                 })
                 .eq('id', request.id)
 
