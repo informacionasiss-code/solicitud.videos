@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, Video } from "lucide-react";
+import { Eye, Video, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { STATUS_LABELS } from "@/lib/schemas";
@@ -37,6 +38,19 @@ export default function Registros() {
             return data;
         },
     });
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("¿Estás seguro de que quieres eliminar esta solicitud? Esta acción no se puede deshacer.")) return;
+
+        try {
+            const { error } = await supabase.from('solicitudes').delete().eq('id', id);
+            if (error) throw error;
+            toast.success("Solicitud eliminada");
+            refetch();
+        } catch (error: any) {
+            toast.error("Error al eliminar: " + error.message);
+        }
+    };
 
     const columns: ColumnDef<any>[] = [
         {
@@ -92,8 +106,11 @@ export default function Registros() {
                         <Button variant="ghost" size="icon" onClick={() => {
                             setSelectedRequest(row.original);
                             setIsModalOpen(true);
-                        }}>
+                        }} title="Ver/Editar">
                             <Eye className="h-4 w-4 text-slate-500" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(row.original.id)} title="Eliminar" className="hover:text-red-600 hover:bg-red-50">
+                            <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
                         </Button>
                     </div>
                 )
