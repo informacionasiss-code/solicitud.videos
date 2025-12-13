@@ -1,17 +1,17 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { UploadCloud, FileText } from "lucide-react";
+import { UploadCloud, FileText, Sparkles, CheckCircle } from "lucide-react";
 import { RequestForm } from "@/components/forms/RequestForm";
 import { parseEmlFile } from "@/lib/parser";
 import { RequestFormValues } from "@/lib/schemas";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { Card } from "@/components/ui/card";
 
 export default function Ingresos() {
     const [parsedData, setParsedData] = useState<Partial<RequestFormValues> | null>(null);
     const [loading, setLoading] = useState(false);
+    const [fileUploaded, setFileUploaded] = useState(false);
     const navigate = useNavigate();
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -20,14 +20,11 @@ export default function Ingresos() {
             try {
                 setLoading(true);
                 const data = await parseEmlFile(file);
-                // Transform parsed data to form format if needed
-                // E.g. date formatting
                 setParsedData({
                     ...data,
-                    // Add default timestamps if missing or format them
-                    // incident_at: data.incident_at ? new Date(data.incident_at).toISOString().slice(0, 16) : undefined
                 });
-                toast.success("Archivo procesado correctamente");
+                setFileUploaded(true);
+                toast.success("Archivo .eml procesado correctamente");
             } catch (error) {
                 console.error(error);
                 toast.error("Error al leer el archivo .eml");
@@ -46,7 +43,6 @@ export default function Ingresos() {
     const handleSubmit = async (values: RequestFormValues) => {
         try {
             setLoading(true);
-            // Insert into Supabase
             const { error } = await supabase.from('solicitudes').insert([
                 {
                     case_number: values.case_number,
@@ -63,7 +59,7 @@ export default function Ingresos() {
             if (error) throw error;
 
             toast.success("Solicitud creada exitosamente");
-            navigate("/registros"); // Redirect to list
+            navigate("/registros");
         } catch (error: any) {
             console.error(error);
             toast.error("Error al guardar: " + error.message);
@@ -73,49 +69,101 @@ export default function Ingresos() {
     };
 
     return (
-        <div className="space-y-8 max-w-4xl mx-auto">
-            <div>
-                <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Nuevo Ingreso</h2>
-                <p className="text-slate-500">Crea una solicitud manual o arrastra un correo (.eml).</p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-                <div className="md:col-span-1">
-                    <Card
+        <div className="space-y-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
+                {/* Left Column - Drop Zone */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Drop Zone Card */}
+                    <div
                         {...getRootProps()}
-                        className={`flex flex-col items-center justify-center p-8 border-2 border-dashed cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-900 ${isDragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-300'}`}
+                        className={`drop-zone relative p-8 flex flex-col items-center justify-center cursor-pointer min-h-[280px] ${isDragActive ? 'active border-blue-500 bg-blue-50' : ''
+                            } ${fileUploaded ? 'border-emerald-500 bg-emerald-50' : ''}`}
                     >
                         <input {...getInputProps()} />
-                        <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-                            {loading ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-600"></div> : <UploadCloud className="h-6 w-6 text-slate-600" />}
-                        </div>
-                        <p className="text-sm font-medium text-center text-slate-900">
-                            {isDragActive ? "Suelta el archivo aquí" : "Arrastra un .eml"}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1 text-center">
-                            o haz click para buscar
-                        </p>
-                    </Card>
 
-                    <div className="mt-4 p-4 bg-blue-50 rounded-lg text-sm text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
-                        <h4 className="font-semibold mb-2 flex items-center"><FileText className="h-4 w-4 mr-2" /> Instrucciones</h4>
-                        <p>El archivo .eml debe contener:</p>
-                        <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
-                            <li>#Caso (en asunto/cuerpo)</li>
-                            <li>Fecha incidente</li>
-                            <li>PPU</li>
-                            <li>Motivo</li>
-                        </ul>
+                        {fileUploaded ? (
+                            <>
+                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-4 shadow-lg">
+                                    <CheckCircle className="h-8 w-8 text-white" />
+                                </div>
+                                <p className="text-lg font-semibold text-emerald-700">¡Archivo Cargado!</p>
+                                <p className="text-sm text-emerald-600 mt-1">Los datos han sido extraídos</p>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setFileUploaded(false); setParsedData(null); }}
+                                    className="mt-4 text-xs text-slate-500 hover:text-slate-700 underline"
+                                >
+                                    Cargar otro archivo
+                                </button>
+                            </>
+                        ) : loading ? (
+                            <>
+                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg animate-pulse">
+                                    <Sparkles className="h-8 w-8 text-white animate-spin" />
+                                </div>
+                                <p className="text-lg font-semibold text-slate-700">Procesando...</p>
+                                <p className="text-sm text-slate-500 mt-1">Extrayendo datos del correo</p>
+                            </>
+                        ) : (
+                            <>
+                                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-lg transition-all ${isDragActive
+                                        ? 'bg-gradient-to-br from-blue-500 to-indigo-600 scale-110'
+                                        : 'bg-gradient-to-br from-slate-500 to-slate-600'
+                                    }`}>
+                                    <UploadCloud className="h-8 w-8 text-white" />
+                                </div>
+                                <p className="text-lg font-semibold text-slate-700">
+                                    {isDragActive ? "Suelta aquí" : "Arrastra un .eml"}
+                                </p>
+                                <p className="text-sm text-slate-500 mt-1 text-center">
+                                    o haz click para seleccionar
+                                </p>
+                                <div className="mt-6 px-4 py-2 bg-slate-100 rounded-full text-xs text-slate-500">
+                                    Solo archivos .eml
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Instructions Card */}
+                    <div className="card-premium p-6">
+                        <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-blue-600" />
+                            Formato Esperado
+                        </h4>
+                        <p className="text-sm text-slate-600 mb-3">
+                            El archivo .eml debe contener las siguientes etiquetas:
+                        </p>
+                        <div className="space-y-2">
+                            {[
+                                { label: "Case number #", desc: "Número de caso" },
+                                { label: "Fecha del incidente:", desc: "dd/mm/yyyy" },
+                                { label: "Fecha de ingreso:", desc: "dd/mm/yyyy" },
+                                { label: "PPU:", desc: "Patente del vehículo" },
+                                { label: "Punto del incidente:", desc: "Ubicación" },
+                            ].map((item, i) => (
+                                <div key={i} className="flex items-center text-xs">
+                                    <code className="px-2 py-1 bg-slate-100 rounded text-slate-700 font-mono">{item.label}</code>
+                                    <span className="ml-2 text-slate-500">{item.desc}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
-                <div className="md:col-span-2">
-                    <RequestForm
-                        initialValues={parsedData || {}}
-                        onSubmit={handleSubmit}
-                        isLoading={loading}
-                        key={parsedData ? 'loaded' : 'new'} // Force re-render on data load
-                    />
+                {/* Right Column - Form */}
+                <div className="lg:col-span-3">
+                    <div className="card-premium p-6">
+                        <div className="mb-6">
+                            <h3 className="text-lg font-semibold text-slate-900">Datos de la Solicitud</h3>
+                            <p className="text-sm text-slate-500">Completa los campos requeridos</p>
+                        </div>
+                        <RequestForm
+                            initialValues={parsedData || {}}
+                            onSubmit={handleSubmit}
+                            isLoading={loading}
+                            key={parsedData ? 'loaded' : 'new'}
+                        />
+                    </div>
                 </div>
             </div>
         </div>

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, Video, Trash2 } from "lucide-react";
+import { Eye, Video, Trash2, Filter, Search } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -52,22 +52,45 @@ export default function Registros() {
         }
     };
 
+    const getStatusColor = (status: string) => {
+        const colors: Record<string, string> = {
+            pendiente: "bg-slate-100 text-slate-700 border-slate-200",
+            en_revision: "bg-amber-100 text-amber-700 border-amber-200",
+            revisado: "bg-blue-100 text-blue-700 border-blue-200",
+            pendiente_envio: "bg-indigo-100 text-indigo-700 border-indigo-200",
+            enviado: "bg-emerald-100 text-emerald-700 border-emerald-200"
+        };
+        return colors[status] || "bg-slate-100 text-slate-700";
+    };
+
     const columns: ColumnDef<any>[] = [
         {
             accessorKey: "case_number",
             header: "Caso",
-            cell: ({ row }) => <span className="font-medium">#{row.getValue("case_number")}</span>,
+            cell: ({ row }) => (
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                        #{row.getValue("case_number")?.toString().slice(-3) || "—"}
+                    </div>
+                    <span className="font-semibold text-slate-900">#{row.getValue("case_number")}</span>
+                </div>
+            ),
         },
         {
             accessorKey: "ppu",
             header: "PPU",
+            cell: ({ row }) => <span className="font-mono text-sm bg-slate-100 px-2 py-1 rounded">{row.getValue("ppu")}</span>,
         },
         {
             accessorKey: "incident_at",
             header: "Fecha Incidente",
             cell: ({ row }) => {
                 const date = row.getValue("incident_at");
-                return date ? format(new Date(date as string), "dd/MM/yyyy HH:mm", { locale: es }) : "-";
+                return date ? (
+                    <span className="text-sm text-slate-600">
+                        {format(new Date(date as string), "dd MMM yyyy, HH:mm", { locale: es })}
+                    </span>
+                ) : <span className="text-slate-400">—</span>;
             },
         },
         {
@@ -75,14 +98,11 @@ export default function Registros() {
             header: "Estado",
             cell: ({ row }) => {
                 const status = row.getValue("status") as keyof typeof STATUS_LABELS;
-                const colorMap: Record<string, "pending" | "review" | "done" | "default" | "outline"> = {
-                    pendiente: "outline",
-                    en_revision: "pending",
-                    revisado: "review",
-                    pendiente_envio: "default",
-                    enviado: "done"
-                }
-                return <Badge variant={colorMap[status] || "default"}>{STATUS_LABELS[status]}</Badge>;
+                return (
+                    <Badge className={`${getStatusColor(status)} border font-medium`}>
+                        {STATUS_LABELS[status]}
+                    </Badge>
+                );
             },
         },
         {
@@ -90,26 +110,40 @@ export default function Registros() {
             header: "Video",
             cell: ({ row }) => {
                 const url = row.getValue("video_url") as string;
-                if (!url) return <span className="text-slate-400">-</span>;
+                if (!url) return <span className="text-slate-400 text-sm">Sin video</span>;
                 return (
-                    <a href={url} target="_blank" rel="noreferrer" className="flex items-center text-blue-600 hover:underline">
-                        <Video className="h-4 w-4 mr-1" /> Ver
+                    <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium text-sm group">
+                        <Video className="h-4 w-4" />
+                        <span className="group-hover:underline">Ver</span>
                     </a>
                 );
             },
         },
         {
             id: "actions",
+            header: "",
             cell: ({ row }) => {
                 return (
-                    <div className="flex space-x-2">
-                        <Button variant="ghost" size="icon" onClick={() => {
-                            setSelectedRequest(row.original);
-                            setIsModalOpen(true);
-                        }} title="Ver/Editar">
-                            <Eye className="h-4 w-4 text-slate-500" />
+                    <div className="flex items-center justify-end gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                                setSelectedRequest(row.original);
+                                setIsModalOpen(true);
+                            }}
+                            title="Ver/Editar"
+                            className="hover:bg-blue-50"
+                        >
+                            <Eye className="h-4 w-4 text-slate-500 hover:text-blue-600" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(row.original.id)} title="Eliminar" className="hover:text-red-600 hover:bg-red-50">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(row.original.id)}
+                            title="Eliminar"
+                            className="hover:bg-red-50"
+                        >
                             <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
                         </Button>
                     </div>
@@ -120,35 +154,44 @@ export default function Registros() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Registros</h2>
-                    <p className="text-slate-500">Gestión de todas las solicitudes ingresadas.</p>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Select value={filterStatus} onValueChange={setFilterStatus}>
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Filtrar por estado" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos</SelectItem>
-                            <SelectItem value="pendiente">Pendiente</SelectItem>
-                            <SelectItem value="en_revision">En Revisión</SelectItem>
-                            <SelectItem value="revisado">Revisado</SelectItem>
-                            <SelectItem value="pendiente_envio">Pendiente de Envío</SelectItem>
-                            <SelectItem value="enviado">Enviado</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Input
-                        placeholder="Buscar Caso o PPU..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-[200px]"
-                    />
+            {/* Filters */}
+            <div className="card-premium p-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <Filter className="h-4 w-4" />
+                        <span className="font-medium">Filtros</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                        <Select value={filterStatus} onValueChange={setFilterStatus}>
+                            <SelectTrigger className="w-full sm:w-[180px] bg-white">
+                                <SelectValue placeholder="Estado" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos los estados</SelectItem>
+                                <SelectItem value="pendiente">Pendiente</SelectItem>
+                                <SelectItem value="en_revision">En Revisión</SelectItem>
+                                <SelectItem value="revisado">Revisado</SelectItem>
+                                <SelectItem value="pendiente_envio">Pendiente Envío</SelectItem>
+                                <SelectItem value="enviado">Enviado</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <div className="relative flex-1 sm:flex-none">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Input
+                                placeholder="Buscar caso o PPU..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="w-full sm:w-[220px] pl-9 bg-white"
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <DataTable columns={columns} data={data || []} />
+            {/* Table */}
+            <div className="card-premium overflow-hidden">
+                <DataTable columns={columns} data={data || []} />
+            </div>
 
             <RequestModal
                 isOpen={isModalOpen}
