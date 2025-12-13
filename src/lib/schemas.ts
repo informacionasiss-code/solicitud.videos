@@ -12,7 +12,7 @@ export const requestSchema = z.object({
     obs: z.string().optional(),
     operator_name: z.string().optional(),
     operator_rut: z.string().optional(),
-    failure_type: z.string().optional(),
+    failure_type: z.any().optional(),
     status: z.enum(['pendiente', 'en_revision', 'revisado', 'pendiente_envio', 'enviado']),
 });
 
