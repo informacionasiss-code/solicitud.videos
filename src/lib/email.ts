@@ -147,47 +147,44 @@ ASUNTO: ${subject}
 ${body}`;
 };
 
-// Multi-method email opener with fallbacks
+// Multi-method email opener with fallbacks (NO location.href to avoid blank page!)
 export const openMailClient = (request: any): boolean => {
     const mailtoUrl = getMailtoUrl(request);
 
     console.log('[EMAIL] Attempting to open mail client...');
     console.log('[EMAIL] URL length:', mailtoUrl.length);
 
-    // Method 1: Try window.open (often works better for mailto)
+    // Method 1: Create and click anchor (safest - doesn't navigate away)
     try {
-        const newWindow = window.open(mailtoUrl, '_blank');
-        if (newWindow) {
-            console.log('[EMAIL] Method 1 (window.open) succeeded');
-            return true;
-        }
+        const link = document.createElement('a');
+        link.href = mailtoUrl;
+        link.target = '_self';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+            if (link.parentNode) {
+                document.body.removeChild(link);
+            }
+        }, 100);
+        console.log('[EMAIL] Method 1 (anchor click) triggered');
+        return true;
     } catch (e) {
         console.warn('[EMAIL] Method 1 failed:', e);
     }
 
-    // Method 2: Try window.location.href
+    // Method 2: Try window.open with _self (fallback)
     try {
-        window.location.href = mailtoUrl;
-        console.log('[EMAIL] Method 2 (location.href) triggered');
-        return true;
+        const newWindow = window.open(mailtoUrl, '_self');
+        if (newWindow !== null) {
+            console.log('[EMAIL] Method 2 (window.open) succeeded');
+            return true;
+        }
     } catch (e) {
         console.warn('[EMAIL] Method 2 failed:', e);
     }
 
-    // Method 3: Create and click anchor
-    try {
-        const link = document.createElement('a');
-        link.href = mailtoUrl;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => document.body.removeChild(link), 500);
-        console.log('[EMAIL] Method 3 (anchor click) triggered');
-        return true;
-    } catch (e) {
-        console.warn('[EMAIL] Method 3 failed:', e);
-    }
+    // NOTE: We intentionally DO NOT use window.location.href as it causes blank page in SPAs
 
     console.error('[EMAIL] All methods failed');
     return false;
