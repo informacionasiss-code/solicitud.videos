@@ -39,7 +39,7 @@ Saludos cordiales.
 `;
 };
 
-// Generate HTML version for Resend
+// Generate HTML version for Resend - Professional Corporate Design
 export const generateEmailHtml = (request: any) => {
     const incidentDate = request.incident_at ? new Date(request.incident_at).toLocaleString('es-CL') : 'N/A';
 
@@ -48,72 +48,225 @@ export const generateEmailHtml = (request: any) => {
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #2563eb, #4f46e5); color: white; padding: 20px; border-radius: 8px 8px 0 0; }
-        .content { background: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; border-top: none; }
-        .field { margin-bottom: 12px; }
-        .label { font-weight: bold; color: #1e40af; }
-        .value { margin-left: 8px; }
-        .detail-box { background: white; padding: 15px; border-radius: 6px; border: 1px solid #cbd5e1; margin: 10px 0; }
-        .footer { background: #1e293b; color: #94a3b8; padding: 15px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; }
-        .video-link { color: #3b82f6; text-decoration: underline; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.7; 
+            color: #374151; 
+            margin: 0;
+            padding: 0;
+            background-color: #f3f4f6;
+        }
+        .wrapper {
+            background-color: #f3f4f6;
+            padding: 40px 20px;
+        }
+        .container { 
+            max-width: 640px; 
+            margin: 0 auto; 
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .header { 
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%); 
+            color: white; 
+            padding: 32px 40px;
+            text-align: center;
+        }
+        .header-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            font-size: 28px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .header .case-number {
+            margin: 12px 0 0 0;
+            font-size: 15px;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+        .content { 
+            padding: 40px;
+        }
+        .greeting {
+            font-size: 16px;
+            color: #374151;
+            margin-bottom: 24px;
+        }
+        .info-grid {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 24px;
+            margin: 24px 0;
+            border: 1px solid #e2e8f0;
+        }
+        .info-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            width: 160px;
+            font-weight: 600;
+            color: #1e40af;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .info-value {
+            flex: 1;
+            color: #1f2937;
+            font-size: 15px;
+        }
+        .info-value.highlight {
+            font-weight: 700;
+            font-size: 17px;
+            color: #111827;
+        }
+        .detail-section {
+            background: #ffffff;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 24px;
+            margin: 24px 0;
+        }
+        .detail-title {
+            font-weight: 700;
+            color: #1e40af;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #dbeafe;
+        }
+        .detail-content {
+            color: #4b5563;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        .video-section {
+            background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin: 24px 0;
+            border: 1px solid #bfdbfe;
+        }
+        .video-label {
+            font-weight: 600;
+            color: #1e40af;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 8px;
+        }
+        .video-link {
+            color: #1d4ed8;
+            text-decoration: none;
+            font-weight: 500;
+            word-break: break-all;
+        }
+        .video-link:hover {
+            text-decoration: underline;
+        }
+        .closing {
+            margin-top: 32px;
+            color: #6b7280;
+            font-size: 15px;
+        }
+        .footer { 
+            background: #111827; 
+            color: #9ca3af; 
+            padding: 24px 40px;
+            text-align: center;
+        }
+        .footer-brand {
+            font-weight: 700;
+            color: #ffffff;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .footer-text {
+            font-size: 12px;
+            color: #6b7280;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h2 style="margin: 0;">🎥 Solicitud de Extracción de Video</h2>
-            <p style="margin: 10px 0 0 0; opacity: 0.9;">Caso #${request.case_number || 'N/A'}</p>
-        </div>
-        <div class="content">
-            <p>Estimados,</p>
-            <p>Junto con saludar, envío antecedentes para extracción de video:</p>
-            
-            <div class="field">
-                <span class="label">📋 Caso:</span>
-                <span class="value">${request.case_number || 'N/A'}</span>
+    <div class="wrapper">
+        <div class="container">
+            <div class="header">
+                <div class="header-icon">▶</div>
+                <h1>Extracción de Video</h1>
+                <p class="case-number">Caso N° ${request.case_number || 'N/A'}</p>
             </div>
-            
-            <div class="field">
-                <span class="label">🚌 PPU:</span>
-                <span class="value"><strong>${request.ppu || 'N/A'}</strong></span>
-            </div>
-            
-            <div class="field">
-                <span class="label">📅 Fecha Incidente:</span>
-                <span class="value">${incidentDate}</span>
-            </div>
-            
-            <div class="field">
-                <span class="label">📍 Punto del Incidente:</span>
-                <span class="value">${request.incident_point || 'N/A'}</span>
-            </div>
-            
-            <div class="field">
-                <span class="label">📝 Motivo:</span>
-                <span class="value">${request.reason || 'N/A'}</span>
-            </div>
-            
-            <div class="detail-box">
-                <strong>Detalle:</strong><br>
-                ${(request.detail || 'N/A').replace(/\n/g, '<br>')}
-            </div>
-            
-            <div class="field">
-                <span class="label">🔗 Video URL:</span>
-                <span class="value">
+            <div class="content">
+                <p class="greeting">Estimados,</p>
+                <p>Junto con saludar, adjunto los antecedentes para la extracción de video correspondiente:</p>
+                
+                <div class="info-grid">
+                    <div class="info-row">
+                        <div class="info-label">N° Caso</div>
+                        <div class="info-value">${request.case_number || 'N/A'}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Patente (PPU)</div>
+                        <div class="info-value highlight">${request.ppu || 'N/A'}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Fecha Incidente</div>
+                        <div class="info-value">${incidentDate}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Ubicación</div>
+                        <div class="info-value">${request.incident_point || 'N/A'}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Motivo</div>
+                        <div class="info-value">${request.reason || 'N/A'}</div>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <div class="detail-title">Detalle del Incidente</div>
+                    <div class="detail-content">
+                        ${(request.detail || 'Sin detalle disponible').replace(/\n/g, '<br>')}
+                    </div>
+                </div>
+                
+                <div class="video-section">
+                    <div class="video-label">Enlace al Video</div>
                     ${request.video_url
             ? `<a href="${request.video_url}" class="video-link">${request.video_url}</a>`
-            : '<em>PENDIENTE</em>'}
-                </span>
+            : '<span style="color: #6b7280; font-style: italic;">Pendiente de extracción</span>'}
+                </div>
+                
+                <p class="closing">Saludos cordiales.</p>
             </div>
-            
-            <p style="margin-top: 20px;">Saludos cordiales.</p>
-        </div>
-        <div class="footer">
-            Enviado automáticamente desde el Sistema de Gestión de Videos
+            <div class="footer">
+                <div class="footer-brand">Extracción Videos El Roble</div>
+                <div class="footer-text">Sistema de Gestión de Extracción de Videos</div>
+            </div>
         </div>
     </div>
 </body>

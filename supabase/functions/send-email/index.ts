@@ -43,7 +43,7 @@ serve(async (req) => {
                 Authorization: `Bearer ${RESEND_API_KEY}`,
             },
             body: JSON.stringify({
-                from: "Sistema Videos <notificaciones@videosuselroble.online>",
+                from: "EXTRACCION VIDEOS EL ROBLE <notificaciones@videosuselroble.online>",
                 to,
                 cc,
                 subject,
