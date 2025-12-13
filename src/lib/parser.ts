@@ -9,6 +9,8 @@ export interface ParsedEml {
     incident_point?: string;
     reason?: string;
     detail?: string;
+    operator_name?: string;
+    operator_rut?: string;
 }
 
 function decodeQuotedPrintable(input: string): string {
@@ -20,10 +22,8 @@ function decodeQuotedPrintable(input: string): string {
 function parseSpanishDate(dateStr: string): string | undefined {
     if (!dateStr) return undefined;
 
-    // Clean string
     const cleanStr = dateStr.trim().replace(/\s+/g, ' ');
 
-    // Try multiple formats
     const formats = [
         "dd/MM/yyyy HH:mm",
         "dd/MM/yyyy",
@@ -31,7 +31,7 @@ function parseSpanishDate(dateStr: string): string | undefined {
         "dd-MM-yyyy",
         "yyyy-MM-dd HH:mm",
         "yyyy-MM-dd",
-        "EEEE d 'de' MMMM 'de' yyyy", // Jueves 12 de Diciembre de 2023
+        "EEEE d 'de' MMMM 'de' yyyy",
         "d 'de' MMMM 'de' yyyy",
     ];
 
@@ -39,12 +39,6 @@ function parseSpanishDate(dateStr: string): string | undefined {
         try {
             const parsed = parse(cleanStr, fmt, new Date(), { locale: es });
             if (!isNaN(parsed.getTime())) {
-                // Adjust for timezone if needed, but local input usually implies local time.
-                // However, input[type="datetime-local"] expects "YYYY-MM-DDThh:mm"
-                // We return ISO to be safe, but standard ISO includes Z.
-                // For datetime-local input, we need "YYYY-MM-DDThh:mm" (local time).
-
-                // Manually format to local ISO without timezone conversion issues
                 const pad = (n: number) => n.toString().padStart(2, '0');
                 return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
             }
@@ -55,23 +49,44 @@ function parseSpanishDate(dateStr: string): string | undefined {
     return undefined;
 }
 
+// Parse operator info from "DATOS OB: NOMBRE APELLIDO, RUT 12345678-9" or similar patterns
+function parseOperator(content: string): { name?: string; rut?: string } {
+    // Try pattern: DATOS OB: NAME, RUT or NAME RUT
+    const patterns = [
+        /DATOS\s*OB[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
+        /DATOS\s*OB[:\s]+([A-ZÁÉÍÓÚÑ\s,]+)/i,
+        /Conductor[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
+        /Operador[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
+    ];
+
+    for (const pattern of patterns) {
+        const match = content.match(pattern);
+        if (match) {
+            return {
+                name: match[1]?.trim().replace(/,\s*$/, ''),
+                rut: match[2]?.trim()
+            };
+        }
+    }
+
+    return {};
+}
+
 export async function parseEmlFile(file: File): Promise<ParsedEml> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
 
         reader.onload = (e) => {
             const arrayBuffer = e.target?.result as ArrayBuffer;
-            const decoder = new TextDecoder("iso-8859-1"); // Decode base charset first
+            const decoder = new TextDecoder("iso-8859-1");
             let content = decoder.decode(arrayBuffer);
 
-            // Decode Quoted-Printable if detected (simple heuristic: contains =XX)
             if (content.match(/=[0-9A-F]{2}/i)) {
                 content = decodeQuotedPrintable(content);
             }
 
             const result: ParsedEml = {};
 
-            // Regex Patterns (Adjusted to be more lenient)
             const patterns = {
                 case_number: /Case number #(\d+)/i,
                 case_number_alt: /#\s*(\d{6,})/,
@@ -104,10 +119,14 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             const detailMatch = content.match(patterns.detail);
             if (detailMatch) result.detail = detailMatch[1].trim();
 
-            // Simple HTML tag cleanup if needed
             if (result.detail) {
                 result.detail = result.detail.replace(/<[^>]*>/g, '').trim();
             }
+
+            // Extract operator info
+            const operator = parseOperator(content);
+            if (operator.name) result.operator_name = operator.name;
+            if (operator.rut) result.operator_rut = operator.rut;
 
             resolve(result);
         };
@@ -115,3 +134,4 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
         reader.readAsArrayBuffer(file);
     });
 }
+

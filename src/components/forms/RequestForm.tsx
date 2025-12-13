@@ -177,6 +177,25 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
 
                         {mode === "edit" && (
                             <>
+                                {/* Operator Info (from email) */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="operator_name">Operador</Label>
+                                    <Input
+                                        id="operator_name"
+                                        placeholder="Extraído del email..."
+                                        {...register("operator_name")}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="operator_rut">RUT Operador</Label>
+                                    <Input
+                                        id="operator_rut"
+                                        placeholder="12345678-9"
+                                        {...register("operator_rut")}
+                                    />
+                                </div>
+
                                 <div className="space-y-2 md:col-span-2">
                                     <Label htmlFor="video_url">URL del Video</Label>
                                     <Input id="video_url" placeholder="https://..." {...register("video_url")} />
@@ -184,16 +203,47 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
                                 </div>
 
                                 <div className="space-y-2 md:col-span-2">
-                                    <Label htmlFor="obs">Observaciones</Label>
+                                    <Label>Tipo de Falla (si no hay video)</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { value: 'disco_danado', label: 'Disco Dañado', color: 'bg-red-100 text-red-700 hover:bg-red-200 border-red-200' },
+                                            { value: 'bus_sin_disco', label: 'Bus Sin Disco', color: 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200' },
+                                            { value: 'video_sobreescrito', label: 'Sobreescrito', color: 'bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200' },
+                                            { value: 'error_lectura', label: 'Error Lectura', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200' },
+                                            { value: 'no_disponible', label: 'No Disponible', color: 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200' },
+                                        ].map((option) => (
+                                            <button
+                                                key={option.value}
+                                                type="button"
+                                                onClick={() => form.setValue('failure_type', option.value as any)}
+                                                className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${form.watch('failure_type') === option.value
+                                                        ? option.color + ' ring-2 ring-offset-1 ring-blue-500'
+                                                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+                                                    }`}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        ))}
+                                        {form.watch('failure_type') && (
+                                            <button
+                                                type="button"
+                                                onClick={() => form.setValue('failure_type', '' as any)}
+                                                className="px-3 py-1.5 text-xs font-medium rounded-full bg-white text-slate-500 hover:bg-slate-50 border border-dashed border-slate-300"
+                                            >
+                                                ✕ Limpiar
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 md:col-span-2">
+                                    <Label htmlFor="obs">Observaciones Adicionales</Label>
                                     <Textarea
                                         id="obs"
-                                        placeholder="Ej: Disco malo, video sobreescrito, no disponible..."
+                                        placeholder="Notas adicionales..."
                                         className="min-h-[80px]"
                                         {...register("obs")}
                                     />
-                                    <p className="text-xs text-slate-500">
-                                        Usar si el video no se puede extraer (disco dañado, sobreescrito, etc.)
-                                    </p>
                                 </div>
                             </>
                         )}

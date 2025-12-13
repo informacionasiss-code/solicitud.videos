@@ -2,12 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, FileInput, Send, TrendingUp, ArrowRight, BarChart3, Activity, Calendar, Download } from "lucide-react";
+import { CheckCircle, Clock, FileInput, Send, TrendingUp, ArrowRight, BarChart3, Activity, Calendar, Download, FileSpreadsheet } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { Link } from "react-router-dom";
 import { STATUS_LABELS } from "@/lib/schemas";
-import { exportToCSV } from "@/lib/export";
+import { exportToCSV, exportToExcel } from "@/lib/export";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -87,6 +87,13 @@ export default function Dashboard() {
         }
     };
 
+    const handleExportExcel = () => {
+        if (allData) {
+            exportToExcel(allData, 'solicitudes');
+            toast.success('Archivo Excel descargado');
+        }
+    };
+
     const kpis = [
         { label: "Pendientes", value: stats?.pendientes, icon: FileInput, gradient: "from-slate-500 to-slate-600", bgGradient: "from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900" },
         { label: "En Revisión", value: stats?.enRevision, icon: Clock, gradient: "from-amber-500 to-orange-600", bgGradient: "from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/30" },
@@ -118,10 +125,16 @@ export default function Dashboard() {
                         <span>{stats?.total || 0} solicitudes totales en el sistema</span>
                     </p>
                 </div>
-                <Button onClick={handleExport} variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Exportar CSV
-                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={handleExport} variant="outline" className="gap-2">
+                        <Download className="h-4 w-4" />
+                        CSV
+                    </Button>
+                    <Button onClick={handleExportExcel} className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white">
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Excel
+                    </Button>
+                </div>
             </div>
 
             {/* KPI Cards */}

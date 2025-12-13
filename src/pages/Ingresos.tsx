@@ -50,6 +50,8 @@ export default function Ingresos() {
                     incident_point: values.incident_point,
                     reason: values.reason,
                     detail: values.detail,
+                    operator_name: values.operator_name || null,
+                    operator_rut: values.operator_rut || null,
                     status: 'pendiente'
                 }
             ]);

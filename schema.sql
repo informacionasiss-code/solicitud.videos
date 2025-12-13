@@ -13,7 +13,10 @@ create table solicitudes (
   detail text,
   video_url text,
   video_url_uploaded_at timestamptz,
-  obs text, -- Observaciones: disco malo, sobreescrito, sin video, etc.
+  obs text, -- Observaciones generales
+  operator_name text, -- Nombre del operador (DATOS OB)
+  operator_rut text, -- RUT del operador
+  failure_type text check (failure_type in ('disco_danado', 'bus_sin_disco', 'video_sobreescrito', 'error_lectura', 'no_disponible')),
   status text not null default 'pendiente' check (status in ('pendiente', 'en_revision', 'revisado', 'pendiente_envio', 'enviado')),
   sent_at timestamptz,
   created_at timestamptz default now(),
@@ -22,26 +25,53 @@ create table solicitudes (
   taken_at timestamptz
 );
 
--- RLS Policies (Simplified for 'public' app usage as requested - Use with Caution)
+-- Bus Failures History Table (track issues per bus)
+create table bus_failures (
+  id uuid default uuid_generate_v4() primary key,
+  ppu text not null,
+  failure_type text not null,
+  case_number text,
+  notes text,
+  created_at timestamptz default now()
+);
+
+-- RLS Policies for solicitudes
 alter table solicitudes enable row level security;
 
--- Allow read access to everyone
 create policy "Allow public read access"
   on solicitudes for select
   to anon
   using (true);
 
--- Allow insert access to everyone
 create policy "Allow public insert access"
   on solicitudes for insert
   to anon
   with check (true);
 
--- Allow update access to everyone
 create policy "Allow public update access"
   on solicitudes for update
   to anon
   using (true);
 
+create policy "Allow public delete access"
+  on solicitudes for delete
+  to anon
+  using (true);
+
+-- RLS Policies for bus_failures
+alter table bus_failures enable row level security;
+
+create policy "Allow public read bus_failures"
+  on bus_failures for select
+  to anon
+  using (true);
+
+create policy "Allow public insert bus_failures"
+  on bus_failures for insert
+  to anon
+  with check (true);
+
 -- Realtime
 alter publication supabase_realtime add table solicitudes;
+alter publication supabase_realtime add table bus_failures;
+
