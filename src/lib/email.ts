@@ -258,7 +258,20 @@ export const generateEmailHtml = (request: any) => {
                     <div class="video-label">Enlace al Video</div>
                     ${request.video_url
             ? `<a href="${request.video_url}" class="video-link">${request.video_url}</a>`
-            : '<span style="color: #6b7280; font-style: italic;">Pendiente de extracción</span>'}
+            : `<div style="color: #991b1b; font-weight: 600;">
+                ${request.failure_type
+                ? `⚠️ VIDEO NO DISPONIBLE: ${request.failure_type === 'disco_danado' ? 'Disco Dañado' :
+                    request.failure_type === 'bus_sin_disco' ? 'Bus Sin Disco' :
+                        request.failure_type === 'video_sobreescrito' ? 'Video Sobreescrito' :
+                            request.failure_type === 'error_lectura' ? 'Error de Lectura' :
+                                request.failure_type === 'no_disponible' ? 'No Disponible' :
+                                    request.failure_type
+                }`
+                : request.obs
+                    ? `⚠️ OBSERVACIÓN: ${request.obs}`
+                    : '<span style="color: #6b7280; font-style: italic;">Pendiente de extracción</span>'
+            }
+               </div>`}
                 </div>
                 
                 <p class="closing">Saludos cordiales.</p>
