@@ -46,6 +46,13 @@ export const openMailClient = (request: any) => {
     const to = EMAIL_CONFIG.to.join(',');
     const cc = EMAIL_CONFIG.cc.join(',');
 
-    // Direct location change triggers mailto protocol handler
-    window.location.href = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+    const mailtoUrl = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+
+    // Create anchor element and click it - bypasses modal/dialog blocking
+    const link = document.createElement('a');
+    link.href = mailtoUrl;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
