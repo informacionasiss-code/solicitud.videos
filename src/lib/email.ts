@@ -40,13 +40,16 @@ Saludos cordiales.
 `;
 };
 
-export const openMailClient = (request: any) => {
-    const subject = encodeURIComponent(generateEmailSubject(request.case_number));
-    const body = encodeURIComponent(generateEmailBody(request));
+export const getMailtoUrl = (request: any) => {
+    const subject = encodeURIComponent(generateEmailSubject(request?.case_number || ''));
+    const body = encodeURIComponent(generateEmailBody(request || {}));
     const to = EMAIL_CONFIG.to.join(',');
     const cc = EMAIL_CONFIG.cc.join(',');
+    return `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+};
 
-    const mailtoUrl = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+export const openMailClient = (request: any) => {
+    const mailtoUrl = getMailtoUrl(request);
 
     // Create anchor element and click it - bypasses modal/dialog blocking
     const link = document.createElement('a');
