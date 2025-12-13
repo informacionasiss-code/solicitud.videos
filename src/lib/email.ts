@@ -101,12 +101,12 @@ export const generateEmailHtml = (request: any) => {
             font-weight: 500;
         }
         .content { 
-            padding: 40px;
+            padding: 24px 40px;
         }
         .greeting {
             font-size: 16px;
             color: #374151;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
         .info-grid {
             background: #f8fafc;
@@ -222,7 +222,7 @@ export const generateEmailHtml = (request: any) => {
             </div>
             <div class="content">
                 <p class="greeting">Estimados,</p>
-                <p>Junto con saludar, adjunto los antecedentes para la extracción de video correspondiente:</p>
+                <p>Junto con saludar, informo extracción de videos para el caso N° <strong>${request.case_number || 'N/A'}</strong>:</p>
                 
                 <div class="info-grid">
                     <div class="info-row">
