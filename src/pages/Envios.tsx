@@ -5,10 +5,19 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Send, CheckCircle, Copy, Mail, Sparkles, ExternalLink } from "lucide-react";
-import { openMailClient, generateEmailBody } from "@/lib/email";
+import { generateEmailBody, generateEmailSubject, EMAIL_CONFIG } from "@/lib/email";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useState } from "react";
+
+// Generate mailto URL directly
+const getMailtoUrl = (request: any) => {
+    const subject = encodeURIComponent(generateEmailSubject(request.case_number));
+    const body = encodeURIComponent(generateEmailBody(request));
+    const to = EMAIL_CONFIG.to.join(',');
+    const cc = EMAIL_CONFIG.cc.join(',');
+    return `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+};
 
 export default function Envios() {
     const [previewRequest, setPreviewRequest] = useState<any>(null);
@@ -165,12 +174,14 @@ export default function Envios() {
                         <Button variant="outline" onClick={handleCopyBody} className="w-full sm:w-auto">
                             <Copy className="mr-2 h-4 w-4" /> Copiar Texto
                         </Button>
-                        <Button
-                            onClick={() => openMailClient(previewRequest)}
-                            className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-                        >
-                            <ExternalLink className="mr-2 h-4 w-4" /> Abrir en Mail
-                        </Button>
+                        {previewRequest && (
+                            <a
+                                href={getMailtoUrl(previewRequest)}
+                                className="inline-flex items-center justify-center w-full sm:w-auto px-4 py-2 text-sm font-medium text-white rounded-md bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md"
+                            >
+                                <ExternalLink className="mr-2 h-4 w-4" /> Abrir en Mail
+                            </a>
+                        )}
                         <Button
                             onClick={() => markAsSent(previewRequest.id)}
                             className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
