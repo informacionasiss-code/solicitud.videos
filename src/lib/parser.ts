@@ -49,22 +49,46 @@ function parseSpanishDate(dateStr: string): string | undefined {
     return undefined;
 }
 
-// Parse operator info from "DATOS OB: NOMBRE APELLIDO, RUT 12345678-9" or similar patterns
+// Parse operator info from email content
+// Formats: "DATOS OB: NOMBRE, RUT" or "DATOS OB  NOMBRE APELLIDO RUT" etc.
 function parseOperator(content: string): { name?: string; rut?: string } {
-    // Try pattern: DATOS OB: NAME, RUT or NAME RUT
-    const patterns = [
+    // Try to find DATOS OB section first
+    const datosObPatterns = [
+        // DATOS OB: SALAZAR TAPIA, JORGE ANIBAL 10164679-3
         /DATOS\s*OB[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
-        /DATOS\s*OB[:\s]+([A-ZÁÉÍÓÚÑ\s,]+)/i,
+        // DATOS OB NOMBRE APELLIDO RUT
+        /DATOS\s*OB[:\s]*\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
+        // More flexible: just DATOS OB followed by any text until RUT
+        /DATOS\s*OB[:\s]*([^0-9]+?)(\d{7,8}-[\dkK])/i,
+    ];
+
+    for (const pattern of datosObPatterns) {
+        const match = content.match(pattern);
+        if (match) {
+            const name = match[1]?.trim()
+                .replace(/,\s*$/, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+            const rut = match[2]?.trim().toUpperCase();
+            if (name && name.length > 2) {
+                return { name, rut };
+            }
+        }
+    }
+
+    // Fallback: look for Conductor or Chofer patterns
+    const fallbackPatterns = [
         /Conductor[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
+        /Chofer[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
         /Operador[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
     ];
 
-    for (const pattern of patterns) {
+    for (const pattern of fallbackPatterns) {
         const match = content.match(pattern);
         if (match) {
             return {
                 name: match[1]?.trim().replace(/,\s*$/, ''),
-                rut: match[2]?.trim()
+                rut: match[2]?.trim().toUpperCase()
             };
         }
     }

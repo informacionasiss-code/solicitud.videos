@@ -175,26 +175,27 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
                             <Textarea id="detail" className="min-h-[150px]" placeholder="Texto completo del correo..." {...register("detail")} />
                         </div>
 
+                        {/* Operator Info - Always visible if data exists */}
+                        <div className="space-y-2">
+                            <Label htmlFor="operator_name">Operador (DATOS OB)</Label>
+                            <Input
+                                id="operator_name"
+                                placeholder="Extraído del email..."
+                                {...register("operator_name")}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="operator_rut">RUT Operador</Label>
+                            <Input
+                                id="operator_rut"
+                                placeholder="12345678-9"
+                                {...register("operator_rut")}
+                            />
+                        </div>
+
                         {mode === "edit" && (
                             <>
-                                {/* Operator Info (from email) */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="operator_name">Operador</Label>
-                                    <Input
-                                        id="operator_name"
-                                        placeholder="Extraído del email..."
-                                        {...register("operator_name")}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="operator_rut">RUT Operador</Label>
-                                    <Input
-                                        id="operator_rut"
-                                        placeholder="12345678-9"
-                                        {...register("operator_rut")}
-                                    />
-                                </div>
 
                                 <div className="space-y-2 md:col-span-2">
                                     <Label htmlFor="video_url">URL del Video</Label>
@@ -217,8 +218,8 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
                                                 type="button"
                                                 onClick={() => form.setValue('failure_type', option.value as any)}
                                                 className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${form.watch('failure_type') === option.value
-                                                        ? option.color + ' ring-2 ring-offset-1 ring-blue-500'
-                                                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+                                                    ? option.color + ' ring-2 ring-offset-1 ring-blue-500'
+                                                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
                                                     }`}
                                             >
                                                 {option.label}
