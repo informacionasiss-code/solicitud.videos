@@ -16,10 +16,12 @@ export default function Envios() {
     const { data, refetch } = useQuery({
         queryKey: ['solicitudes-envios'],
         queryFn: async () => {
+            // Show any request that has a video AND is not yet sent
             const { data, error } = await supabase
                 .from('solicitudes')
                 .select('*')
-                .eq('status', 'pendiente_envio')
+                .not('video_url', 'is', null)
+                .neq('status', 'enviado')
                 .order('updated_at', { ascending: false });
 
             if (error) throw error;
