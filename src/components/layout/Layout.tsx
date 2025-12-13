@@ -1,9 +1,10 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, FileInput, TableProperties, Send, Menu, Search, Video, Sparkles } from "lucide-react";
+import { LayoutDashboard, FileInput, TableProperties, Send, Menu, Search, Video, Sparkles, Moon, Sun, Bell } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/context/ThemeContext";
 
 const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (v: boolean) => void }) => {
     const links = [
@@ -31,7 +32,7 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (v: boolea
                     </div>
                     <div>
                         <span className="text-lg font-bold text-white tracking-tight">VideoReq</span>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-widest">Pro</p>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-widest">Enterprise</p>
                     </div>
                 </div>
             </div>
@@ -57,7 +58,7 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (v: boolea
                 ))}
             </nav>
 
-            {/* Footer */}
+            {/* Version Info */}
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
                 <div className="flex items-center gap-3 px-2">
                     <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-xs font-bold text-white shadow-lg">
@@ -75,6 +76,8 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (v: boolea
 
 const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
     const location = useLocation();
+    const { theme, toggleTheme } = useTheme();
+
     const getTitle = () => {
         switch (location.pathname) {
             case "/": return "Dashboard";
@@ -94,26 +97,58 @@ const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
         }
     }
 
+    // Get greeting based on time
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "Buenos días";
+        if (hour < 18) return "Buenas tardes";
+        return "Buenas noches";
+    };
+
     return (
-        <header className="sticky top-0 z-30 flex h-20 items-center justify-between bg-white/80 backdrop-blur-lg px-6 border-b border-slate-200/80">
+        <header className="sticky top-0 z-30 flex h-20 items-center justify-between glass px-6 border-b border-slate-200/80 dark:border-slate-700/50">
             <div className="flex items-center">
-                <Button variant="ghost" size="icon" className="mr-4 lg:hidden hover:bg-slate-100" onClick={onMenuClick}>
-                    <Menu className="h-6 w-6 text-slate-600" />
+                <Button variant="ghost" size="icon" className="mr-4 lg:hidden" onClick={onMenuClick}>
+                    <Menu className="h-6 w-6" />
                 </Button>
                 <div>
-                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">{getTitle()}</h1>
-                    <p className="text-xs text-slate-500 hidden sm:block">{getSubtitle()}</p>
+                    <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">{getTitle()}</h1>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">{getSubtitle()}</p>
                 </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+                {/* Greeting */}
+                <div className="hidden lg:block text-right mr-4">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">{getGreeting()}, Isaac</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{new Date().toLocaleDateString('es-CL', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+                </div>
+
+                {/* Search */}
                 <div className="relative hidden md:block">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input
                         type="search"
                         placeholder="Buscar caso, PPU..."
-                        className="w-72 pl-10 pr-4 h-10 bg-slate-50 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        className="w-64 pl-10 pr-4 h-10 bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 rounded-xl"
                     />
                 </div>
+
+                {/* Notifications */}
+                <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                    <span className="notification-dot" />
+                </Button>
+
+                {/* Theme Toggle */}
+                <Button variant="ghost" size="icon" onClick={toggleTheme} className="hover:bg-slate-100 dark:hover:bg-slate-800">
+                    {theme === 'light' ? (
+                        <Moon className="h-5 w-5 text-slate-600" />
+                    ) : (
+                        <Sun className="h-5 w-5 text-yellow-400" />
+                    )}
+                </Button>
+
+                {/* Avatar */}
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold text-white shadow-md cursor-pointer hover:scale-105 transition-transform">
                     IA
                 </div>
@@ -126,7 +161,10 @@ export const Layout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-violet-50/30 font-sans text-slate-900">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
+            {/* Animated Background */}
+            <div className="animated-bg" />
+
             <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
             {/* Overlay */}
@@ -137,9 +175,9 @@ export const Layout = () => {
                 />
             )}
 
-            <div className="lg:pl-64 flex flex-col min-h-screen">
+            <div className="lg:pl-64 flex flex-col min-h-screen relative">
                 <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
-                <main className="flex-1 p-6 lg:p-8">
+                <main className="flex-1 p-6 lg:p-8 fade-in">
                     <Outlet />
                 </main>
             </div>
