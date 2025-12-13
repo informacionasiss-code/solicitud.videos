@@ -1,7 +1,7 @@
-import { X, Mail, Copy, ExternalLink, CheckCircle, FileText, AlertCircle, Clipboard, Loader2 } from "lucide-react";
+import { X, Mail, Copy, ExternalLink, CheckCircle, FileText, Clipboard, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { generateEmailBody, generateEmailSubject, openMailClient, copyEmailToClipboard, EMAIL_CONFIG } from "@/lib/email";
+import { generateEmailBody, generateEmailSubject, openMailClient, copyEmailToClipboard, EMAIL_CONFIG, sendEmailViaResend } from "@/lib/email";
 import { toast } from "sonner";
 import { useEffect, useState, useCallback } from "react";
 
@@ -15,6 +15,7 @@ interface EmailDrawerProps {
 export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawerProps) {
     const [isVisible, setIsVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isSending, setIsSending] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -72,6 +73,38 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
             toast.error("Error al copiar. Intenta copiar manualmente.");
         }
     }, [request]);
+
+    const handleSendEmail = useCallback(async () => {
+        if (!request) return;
+
+        setIsSending(true);
+        toast.loading("Enviando correo...", { id: "sending-email" });
+
+        try {
+            const result = await sendEmailViaResend(request);
+
+            if (result.success) {
+                toast.success("✅ " + result.message, {
+                    id: "sending-email",
+                    duration: 5000,
+                });
+                // Automatically mark as sent
+                onMarkSent(request.id);
+            } else {
+                toast.error("❌ " + result.message, {
+                    id: "sending-email",
+                    duration: 5000,
+                });
+            }
+        } catch (error: any) {
+            console.error("[RESEND] Error:", error);
+            toast.error("Error al enviar correo: " + (error.message || "Error desconocido"), {
+                id: "sending-email",
+            });
+        } finally {
+            setIsSending(false);
+        }
+    }, [request, onMarkSent]);
 
     return (
         <div className={cn(
@@ -195,25 +228,42 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
                         </div>
                     </div>
 
-                    {/* IMPORTANT: Copy All Button - PROMINENT */}
+                    {/* PRIMARY: Send via Resend API */}
+                    <Button
+                        onClick={handleSendEmail}
+                        disabled={isSending}
+                        className="w-full h-16 text-xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white shadow-xl shadow-indigo-500/40 hover:shadow-indigo-500/60 transition-all hover:-translate-y-1 animate-pulse hover:animate-none"
+                    >
+                        {isSending ? (
+                            <>
+                                <Loader2 className="mr-3 h-7 w-7 animate-spin" />
+                                Enviando...
+                            </>
+                        ) : (
+                            <>
+                                <Send className="mr-3 h-7 w-7" />
+                                📧 ENVIAR CORREO AHORA
+                            </>
+                        )}
+                    </Button>
+
+                    {/* Fallback: Copy All Button */}
                     <Button
                         onClick={handleCopyAll}
-                        className="w-full h-14 text-lg font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all hover:-translate-y-0.5"
+                        variant="outline"
+                        className="w-full h-12 font-bold border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400"
                     >
-                        <Clipboard className="mr-3 h-6 w-6" />
-                        📋 COPIAR TODO (Destinatarios + Asunto + Cuerpo)
+                        <Clipboard className="mr-2 h-5 w-5" />
+                        📋 Copiar Todo (Alternativa)
                     </Button>
 
                     {/* Tips */}
-                    <div className="flex gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-900/30">
-                        <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                        <div className="text-sm text-amber-800 dark:text-amber-300">
-                            <p className="font-semibold mb-1">💡 Método recomendado para correo corporativo:</p>
+                    <div className="flex gap-3 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-200 dark:border-blue-900/30">
+                        <Mail className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                        <div className="text-sm text-blue-800 dark:text-blue-300">
+                            <p className="font-semibold mb-1">📧 Envío automático habilitado</p>
                             <p className="opacity-90 leading-relaxed">
-                                1. Haz clic en <strong>"COPIAR TODO"</strong> arriba<br />
-                                2. Abre Outlook y crea un nuevo correo<br />
-                                3. Pega el contenido (Ctrl+V o Cmd+V)<br />
-                                4. Ajusta los campos y envía
+                                Haz clic en <strong>"ENVIAR CORREO AHORA"</strong> para enviar automáticamente a todos los destinatarios.
                             </p>
                         </div>
                     </div>
