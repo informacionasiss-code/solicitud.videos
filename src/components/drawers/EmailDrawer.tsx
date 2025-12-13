@@ -1,7 +1,7 @@
 import { X, Mail, Copy, ExternalLink, CheckCircle, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getMailtoUrl, generateEmailBody, generateEmailSubject } from "@/lib/email";
+import { generateEmailBody, generateEmailSubject, openMailClient } from "@/lib/email";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 
@@ -145,13 +145,13 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
                     </Button>
 
                     {request && (
-                        <a
-                            href={getMailtoUrl(request)}
+                        <Button
+                            onClick={() => openMailClient(request)}
                             className="inline-flex items-center justify-center h-12 px-6 font-semibold text-white transition-all bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0"
                         >
                             <ExternalLink className="mr-2 h-5 w-5" />
                             Abrir Correo
-                        </a>
+                        </Button>
                     )}
                 </div>
             </div>
