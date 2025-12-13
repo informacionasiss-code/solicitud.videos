@@ -60,7 +60,7 @@ export const generateEmailHtml = (request: any) => {
         }
         .wrapper {
             background-color: #f3f4f6;
-            padding: 40px 20px;
+            padding: 16px 12px;
         }
         .container { 
             max-width: 640px; 
@@ -73,7 +73,7 @@ export const generateEmailHtml = (request: any) => {
         .header { 
             background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%); 
             color: white; 
-            padding: 32px 40px;
+            padding: 20px 32px;
             text-align: center;
         }
         .header-icon {
@@ -101,7 +101,7 @@ export const generateEmailHtml = (request: any) => {
             font-weight: 500;
         }
         .content { 
-            padding: 24px 40px;
+            padding: 16px 32px;
         }
         .greeting {
             font-size: 16px;
