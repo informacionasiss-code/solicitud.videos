@@ -1,9 +1,9 @@
-import { X, Mail, Copy, ExternalLink, CheckCircle, FileText, AlertCircle } from "lucide-react";
+import { X, Mail, Copy, ExternalLink, CheckCircle, FileText, AlertCircle, Clipboard, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { generateEmailBody, generateEmailSubject, openMailClient } from "@/lib/email";
+import { generateEmailBody, generateEmailSubject, openMailClient, copyEmailToClipboard, EMAIL_CONFIG } from "@/lib/email";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface EmailDrawerProps {
     isOpen: boolean;
@@ -14,6 +14,7 @@ interface EmailDrawerProps {
 
 export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawerProps) {
     const [isVisible, setIsVisible] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -32,6 +33,45 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
         navigator.clipboard.writeText(text);
         toast.success(`${label} copiado`);
     };
+
+    const handleOpenEmail = useCallback(async () => {
+        if (!request) return;
+
+        setIsLoading(true);
+
+        try {
+            const result = openMailClient(request);
+
+            // Give a moment for the mail client to potentially open
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            if (result) {
+                toast.success("¡Listo! Si no se abrió tu correo, usa 'COPIAR TODO' abajo.", {
+                    duration: 5000,
+                });
+            } else {
+                toast.error("No se pudo abrir el cliente de correo. Usa 'COPIAR TODO'.");
+            }
+        } catch (e) {
+            console.error('[EMAIL] Error:', e);
+            toast.error("Error al abrir correo. Usa 'COPIAR TODO'.");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [request]);
+
+    const handleCopyAll = useCallback(async () => {
+        if (!request) return;
+
+        const success = await copyEmailToClipboard(request);
+        if (success) {
+            toast.success("✅ TODO COPIADO - Ahora pega en tu correo (destinatarios, asunto y cuerpo incluidos)", {
+                duration: 6000,
+            });
+        } else {
+            toast.error("Error al copiar. Intenta copiar manualmente.");
+        }
+    }, [request]);
 
     return (
         <div className={cn(
@@ -83,6 +123,40 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
                         </div>
                     )}
 
+                    {/* Recipients Section */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Destinatarios</label>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopy(EMAIL_CONFIG.to.join('; '), 'Destinatarios')}
+                                className="h-6 text-[10px] uppercase font-bold text-blue-600 hover:bg-blue-50"
+                            >
+                                <Copy className="mr-1 h-3 w-3" /> Copiar
+                            </Button>
+                        </div>
+                        <p className="text-sm text-slate-700 dark:text-slate-300 break-all">
+                            {EMAIL_CONFIG.to.join('; ')}
+                        </p>
+                        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">CC</label>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleCopy(EMAIL_CONFIG.cc.join('; '), 'CC')}
+                                    className="h-6 text-[10px] uppercase font-bold text-blue-600 hover:bg-blue-50"
+                                >
+                                    <Copy className="mr-1 h-3 w-3" /> Copiar
+                                </Button>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 break-all">
+                                {EMAIL_CONFIG.cc.join('; ')}
+                            </p>
+                        </div>
+                    </div>
+
                     {/* Subject Section */}
                     <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm group hover:border-blue-400 dark:hover:border-blue-600 transition-colors">
                         <div className="flex items-center justify-between mb-2">
@@ -102,7 +176,7 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
                     </div>
 
                     {/* Body Section */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col h-[400px] group hover:border-blue-400 dark:hover:border-blue-600 transition-colors">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col h-[300px] group hover:border-blue-400 dark:hover:border-blue-600 transition-colors">
                         <div className="flex items-center justify-between mb-3 border-b border-slate-100 dark:border-slate-800 pb-2">
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cuerpo del Mensaje</label>
                             <Button
@@ -111,7 +185,7 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
                                 onClick={() => request && handleCopy(generateEmailBody(request), 'Cuerpo')}
                                 className="h-6 text-[10px] uppercase font-bold text-blue-600 hover:bg-blue-50"
                             >
-                                <Copy className="mr-1 h-3 w-3" /> Copiar Todo
+                                <Copy className="mr-1 h-3 w-3" /> Copiar
                             </Button>
                         </div>
                         <div className="flex-1 overflow-y-auto relative bg-slate-50 dark:bg-slate-950/50 rounded-lg p-3">
@@ -121,13 +195,25 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
                         </div>
                     </div>
 
+                    {/* IMPORTANT: Copy All Button - PROMINENT */}
+                    <Button
+                        onClick={handleCopyAll}
+                        className="w-full h-14 text-lg font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all hover:-translate-y-0.5"
+                    >
+                        <Clipboard className="mr-3 h-6 w-6" />
+                        📋 COPIAR TODO (Destinatarios + Asunto + Cuerpo)
+                    </Button>
+
                     {/* Tips */}
-                    <div className="flex gap-3 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30">
-                        <AlertCircle className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-                        <div className="text-sm text-blue-800 dark:text-blue-300">
-                            <p className="font-semibold mb-1">¿Problemas con el botón?</p>
+                    <div className="flex gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-900/30">
+                        <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="text-sm text-amber-800 dark:text-amber-300">
+                            <p className="font-semibold mb-1">💡 Método recomendado para correo corporativo:</p>
                             <p className="opacity-90 leading-relaxed">
-                                Si el botón principal no abre tu correo, usa los botones de "COPIAR" y pega la información manualmente en tu cliente de correo favorito.
+                                1. Haz clic en <strong>"COPIAR TODO"</strong> arriba<br />
+                                2. Abre Outlook y crea un nuevo correo<br />
+                                3. Pega el contenido (Ctrl+V o Cmd+V)<br />
+                                4. Ajusta los campos y envía
                             </p>
                         </div>
                     </div>
@@ -146,11 +232,16 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
 
                     {request && (
                         <Button
-                            onClick={() => openMailClient(request)}
-                            className="inline-flex items-center justify-center h-12 px-6 font-semibold text-white transition-all bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0"
+                            onClick={handleOpenEmail}
+                            disabled={isLoading}
+                            className="inline-flex items-center justify-center h-12 px-6 font-semibold text-white transition-all bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
                         >
-                            <ExternalLink className="mr-2 h-5 w-5" />
-                            Abrir Correo
+                            {isLoading ? (
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            ) : (
+                                <ExternalLink className="mr-2 h-5 w-5" />
+                            )}
+                            Intentar Abrir Correo
                         </Button>
                     )}
                 </div>
@@ -158,3 +249,4 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
         </div>
     );
 }
+
