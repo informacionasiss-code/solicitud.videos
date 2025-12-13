@@ -50,20 +50,34 @@ function parseSpanishDate(dateStr: string): string | undefined {
 }
 
 // Parse operator info from email content
-// Formats: "DATOS OB: NOMBRE, RUT" or "DATOS OB  NOMBRE APELLIDO RUT" etc.
+// Format: "DATOS OB:" on one line, then "NAME RUT" on next line
 function parseOperator(content: string): { name?: string; rut?: string } {
-    // Try to find DATOS OB section first
-    const datosObPatterns = [
-        // DATOS OB: SALAZAR TAPIA, JORGE ANIBAL 10164679-3
+    // Pattern for multiline: DATOS OB: followed by newline(s) then NAME RUT
+    // Example: 
+    // DATOS OB:
+    // VIVANCO ZUÑIGA, VALESKA CORINA 15418817-7
+    const multilinePattern = /DATOS\s*OB[:\s]*[\r\n]+\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i;
+
+    let match = content.match(multilinePattern);
+    if (match) {
+        const name = match[1]?.trim()
+            .replace(/,\s*$/, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const rut = match[2]?.trim().toUpperCase();
+        if (name && name.length > 2) {
+            return { name, rut };
+        }
+    }
+
+    // Fallback: same line format
+    const sameLinePatterns = [
         /DATOS\s*OB[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
-        // DATOS OB NOMBRE APELLIDO RUT
-        /DATOS\s*OB[:\s]*\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
-        // More flexible: just DATOS OB followed by any text until RUT
-        /DATOS\s*OB[:\s]*([^0-9]+?)(\d{7,8}-[\dkK])/i,
+        /DATOS\s*OB[:\s]*([^0-9\n]+?)(\d{7,8}-[\dkK])/i,
     ];
 
-    for (const pattern of datosObPatterns) {
-        const match = content.match(pattern);
+    for (const pattern of sameLinePatterns) {
+        match = content.match(pattern);
         if (match) {
             const name = match[1]?.trim()
                 .replace(/,\s*$/, '')
@@ -76,15 +90,14 @@ function parseOperator(content: string): { name?: string; rut?: string } {
         }
     }
 
-    // Fallback: look for Conductor or Chofer patterns
+    // Last fallback: Conductor/Chofer patterns
     const fallbackPatterns = [
         /Conductor[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
         /Chofer[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
-        /Operador[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
     ];
 
     for (const pattern of fallbackPatterns) {
-        const match = content.match(pattern);
+        match = content.match(pattern);
         if (match) {
             return {
                 name: match[1]?.trim().replace(/,\s*$/, ''),
