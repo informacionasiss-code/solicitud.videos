@@ -25,6 +25,22 @@ export function generatePendingPPUsPDF(requests: PendingRequest[]) {
     const darkColor: [number, number, number] = [30, 41, 59]; // Slate-800
     const lightGray: [number, number, number] = [241, 245, 249]; // Slate-100
     const mediumGray: [number, number, number] = [100, 116, 139]; // Slate-500
+    const warningColor: [number, number, number] = [245, 158, 11]; // Amber-500
+
+    // Group by unique PPU and count cases
+    const ppuMap: Record<string, number> = {};
+    requests.forEach(req => {
+        const ppu = req.ppu || 'SIN PPU';
+        ppuMap[ppu] = (ppuMap[ppu] || 0) + 1;
+    });
+
+    // Convert to array and sort alphabetically
+    const uniquePPUs = Object.entries(ppuMap)
+        .map(([ppu, count]) => ({ ppu, count }))
+        .sort((a, b) => a.ppu.localeCompare(b.ppu));
+
+    const totalBuses = uniquePPUs.length;
+    const totalCases = requests.length;
 
     // Header background gradient effect (rectangle)
     doc.setFillColor(...primaryColor);
@@ -44,19 +60,19 @@ export function generatePendingPPUsPDF(requests: PendingRequest[]) {
     // Date and count
     doc.setFontSize(10);
     const today = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es });
-    doc.text(`Generado: ${today} | Total: ${requests.length} buses`, pageWidth / 2, 38, { align: 'center' });
+    doc.text(`Generado: ${today} | ${totalBuses} buses | ${totalCases} casos`, pageWidth / 2, 38, { align: 'center' });
 
     // Content area
     let yPos = 55;
 
     // Calculate grid layout
-    const columns = 4;
+    const columns = 5;
     const cellWidth = contentWidth / columns;
-    const cellHeight = 22;
+    const cellHeight = 18;
     const cellPadding = 3;
 
-    // Draw PPU grid
-    requests.forEach((req, index) => {
+    // Draw PPU grid (unique PPUs only)
+    uniquePPUs.forEach((item, index) => {
         const col = index % columns;
         const row = Math.floor(index / columns);
         const xPos = margin + (col * cellWidth);
@@ -66,7 +82,7 @@ export function generatePendingPPUsPDF(requests: PendingRequest[]) {
         if (currentY + cellHeight > pageHeight - 30) {
             doc.addPage();
             yPos = 20;
-            return; // Skip this iteration as positioning needs recalculation
+            return;
         }
 
         // Cell background - alternating colors
@@ -84,15 +100,17 @@ export function generatePendingPPUsPDF(requests: PendingRequest[]) {
 
         // PPU text (main, bold)
         doc.setTextColor(...darkColor);
-        doc.setFontSize(14);
+        doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
-        doc.text(req.ppu || 'N/A', xPos + cellPadding, currentY + 10);
+        doc.text(item.ppu, xPos + cellPadding, currentY + 10);
 
-        // Case number (smaller, gray)
-        doc.setTextColor(...mediumGray);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`#${req.case_number}`, xPos + cellPadding, currentY + 17);
+        // Show case count if more than 1
+        if (item.count > 1) {
+            doc.setTextColor(...warningColor);
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`(${item.count} casos)`, xPos + cellPadding, currentY + 15);
+        }
     });
 
     // Footer
@@ -104,7 +122,7 @@ export function generatePendingPPUsPDF(requests: PendingRequest[]) {
     doc.setTextColor(...mediumGray);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text('Sistema de Gestión de Extracción de Videos', pageWidth / 2, footerY, { align: 'center' });
+    doc.text('Extracción Videos El Roble', pageWidth / 2, footerY, { align: 'center' });
     doc.text(`Página 1 de 1`, pageWidth / 2, footerY + 5, { align: 'center' });
 
     // Download
@@ -113,3 +131,4 @@ export function generatePendingPPUsPDF(requests: PendingRequest[]) {
 
     return filename;
 }
+
