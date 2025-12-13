@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, Video, Trash2, Filter, Search, Download, RefreshCw, CheckSquare } from "lucide-react";
+import { Eye, Video, Trash2, Filter, Search, Download, RefreshCw, CheckSquare, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -14,6 +14,7 @@ import { STATUS_LABELS } from "@/lib/schemas";
 import { useState } from "react";
 import { RequestModal } from "@/components/modals/RequestModal";
 import { exportToCSV } from "@/lib/export";
+import { generatePendingPPUsPDF } from "@/lib/pdfGenerator";
 
 export default function Registros() {
     const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -76,6 +77,29 @@ export default function Registros() {
         if (data) {
             exportToCSV(data, 'solicitudes_filtradas');
             toast.success('CSV descargado');
+        }
+    };
+
+    const handleDownloadPendingPDF = async () => {
+        try {
+            // Fetch only pending items (status pendiente AND no video)
+            const { data: pendingData, error } = await supabase
+                .from('solicitudes')
+                .select('ppu, case_number, incident_at')
+                .is('video_url', null)
+                .order('ppu', { ascending: true });
+
+            if (error) throw error;
+
+            if (!pendingData || pendingData.length === 0) {
+                toast.error('No hay patentes pendientes de extracción');
+                return;
+            }
+
+            generatePendingPPUsPDF(pendingData);
+            toast.success(`PDF descargado: ${pendingData.length} patentes pendientes`);
+        } catch (error: any) {
+            toast.error('Error al generar PDF: ' + error.message);
         }
     };
 
@@ -257,7 +281,14 @@ export default function Registros() {
                         </Button>
                         <Button variant="outline" onClick={handleExport} className="gap-2">
                             <Download className="h-4 w-4" />
-                            <span className="hidden sm:inline">Exportar</span>
+                            <span className="hidden sm:inline">CSV</span>
+                        </Button>
+                        <Button
+                            onClick={handleDownloadPendingPDF}
+                            className="gap-2 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white shadow-md"
+                        >
+                            <FileText className="h-4 w-4" />
+                            <span className="hidden sm:inline">PDF Pendientes</span>
                         </Button>
                         {selectedIds.length > 0 && (
                             <Button variant="destructive" onClick={handleBulkDelete} size="sm">
