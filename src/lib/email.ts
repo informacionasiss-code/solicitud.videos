@@ -43,8 +43,17 @@ Saludos cordiales.
 export const openMailClient = (request: any) => {
     const subject = encodeURIComponent(generateEmailSubject(request.case_number));
     const body = encodeURIComponent(generateEmailBody(request));
-    const to = EMAIL_CONFIG.to.join(','); // mailto separates by comma usually
+    const to = EMAIL_CONFIG.to.join(',');
     const cc = EMAIL_CONFIG.cc.join(',');
 
-    window.location.href = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+    const mailtoUrl = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+
+    // Use window.open for better cross-platform compatibility
+    const mailWindow = window.open(mailtoUrl, '_blank');
+
+    // If popup was blocked or mailto didn't work, try alternate method
+    if (!mailWindow || mailWindow.closed || typeof mailWindow.closed === 'undefined') {
+        // Fallback to location.href
+        window.location.href = mailtoUrl;
+    }
 };
