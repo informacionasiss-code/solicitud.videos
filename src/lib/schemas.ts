@@ -8,7 +8,7 @@ export const requestSchema = z.object({
     incident_point: z.string().optional(),
     reason: z.string().optional(),
     detail: z.string().optional(),
-    video_url: z.string().url("URL inválida").optional().or(z.literal("")),
+    video_url: z.string().optional(),
     obs: z.string().optional(),
     operator_name: z.string().optional(),
     operator_rut: z.string().optional(),
