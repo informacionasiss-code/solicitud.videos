@@ -89,11 +89,25 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
     }, [caseNumber, checkCaseExists]);
 
     const handleFormSubmit = async (data: RequestFormValues) => {
+        console.log('[FORM] Submitting data:', data);
         if (caseExists && mode === "create") {
-            return; // Prevent submit if case exists
+            console.log('[FORM] Blocked: case already exists');
+            return;
         }
-        await onSubmit(data);
+        try {
+            await onSubmit(data);
+            console.log('[FORM] Submit successful');
+        } catch (error) {
+            console.error('[FORM] Submit error:', error);
+        }
     };
+
+    // Log validation errors
+    useEffect(() => {
+        if (Object.keys(errors).length > 0) {
+            console.log('[FORM] Validation errors:', errors);
+        }
+    }, [errors]);
 
     return (
         <Card className="w-full">
@@ -102,6 +116,16 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+                    {Object.keys(errors).length > 0 && (
+                        <div className="p-3 bg-red-100 border border-red-300 rounded-lg text-sm text-red-700">
+                            <strong>Errores de validación:</strong>
+                            <ul className="list-disc ml-4 mt-1">
+                                {Object.entries(errors).map(([key, err]) => (
+                                    <li key={key}>{key}: {(err as any)?.message || 'Error'}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
 
                         <div className="space-y-2">
