@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import Ingresos from "@/pages/Ingresos";
 import Registros from "@/pages/Registros";
 import Envios from "@/pages/Envios";
+import PPUAgrupados from "@/pages/PPUAgrupados";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/ingresos" element={<Ingresos />} />
               <Route path="/registros" element={<Registros />} />
+              <Route path="/agrupados" element={<PPUAgrupados />} />
               <Route path="/envios" element={<Envios />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Route>

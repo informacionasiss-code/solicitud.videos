@@ -9,6 +9,7 @@ export const requestSchema = z.object({
     reason: z.string().optional(),
     detail: z.string().optional(),
     video_url: z.string().url("URL inválida").optional().or(z.literal("")),
+    obs: z.string().optional(), // Observaciones: disco malo, sobreescrito, etc.
     status: z.enum(['pendiente', 'en_revision', 'revisado', 'pendiente_envio', 'enviado']),
 });
 

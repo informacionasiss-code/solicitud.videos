@@ -6,13 +6,11 @@ import { parseEmlFile } from "@/lib/parser";
 import { RequestFormValues } from "@/lib/schemas";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
 
 export default function Ingresos() {
     const [parsedData, setParsedData] = useState<Partial<RequestFormValues> | null>(null);
     const [loading, setLoading] = useState(false);
     const [fileUploaded, setFileUploaded] = useState(false);
-    const navigate = useNavigate();
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const file = acceptedFiles[0];
@@ -58,8 +56,10 @@ export default function Ingresos() {
 
             if (error) throw error;
 
-            toast.success("Solicitud creada exitosamente");
-            navigate("/registros");
+            toast.success("✅ Solicitud creada exitosamente");
+            // Reset form for next entry instead of navigating away
+            setParsedData(null);
+            setFileUploaded(false);
         } catch (error: any) {
             console.error(error);
             toast.error("Error al guardar: " + error.message);
@@ -106,8 +106,8 @@ export default function Ingresos() {
                         ) : (
                             <>
                                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-lg transition-all ${isDragActive
-                                        ? 'bg-gradient-to-br from-blue-500 to-indigo-600 scale-110'
-                                        : 'bg-gradient-to-br from-slate-500 to-slate-600'
+                                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600 scale-110'
+                                    : 'bg-gradient-to-br from-slate-500 to-slate-600'
                                     }`}>
                                     <UploadCloud className="h-8 w-8 text-white" />
                                 </div>

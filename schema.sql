@@ -13,6 +13,7 @@ create table solicitudes (
   detail text,
   video_url text,
   video_url_uploaded_at timestamptz,
+  obs text, -- Observaciones: disco malo, sobreescrito, sin video, etc.
   status text not null default 'pendiente' check (status in ('pendiente', 'en_revision', 'revisado', 'pendiente_envio', 'enviado')),
   sent_at timestamptz,
   created_at timestamptz default now(),

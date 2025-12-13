@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, FileInput, TableProperties, Send, Menu, Search, Video, Sparkles, Moon, Sun, Bell } from "lucide-react";
+import { LayoutDashboard, FileInput, TableProperties, Send, Menu, Search, Video, Sparkles, Moon, Sun, Bell, Bus } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (v: boolea
         { to: "/", label: "Dashboard", icon: LayoutDashboard },
         { to: "/ingresos", label: "Ingresos", icon: FileInput },
         { to: "/registros", label: "Registros", icon: TableProperties },
+        { to: "/agrupados", label: "PPU Agrupados", icon: Bus },
         { to: "/envios", label: "Envíos", icon: Send },
     ];
 
@@ -83,6 +84,7 @@ const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
             case "/": return "Dashboard";
             case "/ingresos": return "Nuevo Ingreso";
             case "/registros": return "Gestión de Registros";
+            case "/agrupados": return "PPU Agrupados";
             case "/envios": return "Centro de Envíos";
             default: return "Video Request";
         }
@@ -92,6 +94,7 @@ const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
             case "/": return "Vista general del sistema";
             case "/ingresos": return "Crea una nueva solicitud";
             case "/registros": return "Administra todas las solicitudes";
+            case "/agrupados": return "Extrae videos agrupados por bus";
             case "/envios": return "Prepara y envía correos";
             default: return "";
         }
