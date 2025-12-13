@@ -46,14 +46,6 @@ export const openMailClient = (request: any) => {
     const to = EMAIL_CONFIG.to.join(',');
     const cc = EMAIL_CONFIG.cc.join(',');
 
-    const mailtoUrl = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
-
-    // Use window.open for better cross-platform compatibility
-    const mailWindow = window.open(mailtoUrl, '_blank');
-
-    // If popup was blocked or mailto didn't work, try alternate method
-    if (!mailWindow || mailWindow.closed || typeof mailWindow.closed === 'undefined') {
-        // Fallback to location.href
-        window.location.href = mailtoUrl;
-    }
+    // Direct location change triggers mailto protocol handler
+    window.location.href = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
 };
