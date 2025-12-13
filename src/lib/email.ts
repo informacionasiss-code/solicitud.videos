@@ -258,19 +258,27 @@ export const generateEmailHtml = (request: any) => {
                     <div class="video-label">Enlace al Video</div>
                     ${request.video_url
             ? `<a href="${request.video_url}" class="video-link">${request.video_url}</a>`
-            : `<div style="color: #991b1b; font-weight: 600;">
-                ${request.failure_type
-                ? `⚠️ VIDEO NO DISPONIBLE: ${request.failure_type === 'disco_danado' ? 'Disco Dañado' :
-                    request.failure_type === 'bus_sin_disco' ? 'Bus Sin Disco' :
-                        request.failure_type === 'video_sobreescrito' ? 'Video Sobreescrito' :
-                            request.failure_type === 'error_lectura' ? 'Error de Lectura' :
-                                request.failure_type === 'no_disponible' ? 'No Disponible' :
-                                    request.failure_type
-                }`
-                : request.obs
-                    ? `⚠️ OBSERVACIÓN: ${request.obs}`
-                    : '<span style="color: #6b7280; font-style: italic;">Pendiente de extracción</span>'
-            }
+            : `<div style="color: #991b1b; font-weight: 600; line-height: 1.8;">
+                ${(() => {
+                const failureLabel = request.failure_type
+                    ? (request.failure_type === 'disco_danado' ? 'Disco Dañado' :
+                        request.failure_type === 'bus_sin_disco' ? 'Bus Sin Disco' :
+                            request.failure_type === 'video_sobreescrito' ? 'Video Sobreescrito' :
+                                request.failure_type === 'error_lectura' ? 'Error de Lectura' :
+                                    request.failure_type === 'no_disponible' ? 'No Disponible' :
+                                        request.failure_type)
+                    : null;
+
+                if (failureLabel && request.obs) {
+                    return `⚠️ VIDEO NO DISPONIBLE: ${failureLabel}<br><span style="font-weight: 400; color: #6b7280;">📝 Observación: ${request.obs}</span>`;
+                } else if (failureLabel) {
+                    return `⚠️ VIDEO NO DISPONIBLE: ${failureLabel}`;
+                } else if (request.obs) {
+                    return `⚠️ OBSERVACIÓN: ${request.obs}`;
+                } else {
+                    return '<span style="color: #6b7280; font-style: italic; font-weight: 400;">Pendiente de extracción</span>';
+                }
+            })()}
                </div>`}
                 </div>
                 
