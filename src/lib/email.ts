@@ -232,7 +232,10 @@ export interface SendEmailResult {
 }
 
 // Send email via Resend through Supabase Edge Function
-export const sendEmailViaResend = async (request: any): Promise<SendEmailResult> => {
+export const sendEmailViaResend = async (
+    request: any,
+    customConfig?: { to?: string[]; cc?: string[] }
+): Promise<SendEmailResult> => {
     console.log('[RESEND] Starting email send...');
 
     try {
@@ -243,15 +246,20 @@ export const sendEmailViaResend = async (request: any): Promise<SendEmailResult>
         const html = generateEmailHtml(request);
         const text = generateEmailBody(request);
 
+        // Use custom recipients if provided, otherwise use defaults
+        const toRecipients = customConfig?.to || EMAIL_CONFIG.to;
+        const ccRecipients = customConfig?.cc || EMAIL_CONFIG.cc;
+
         const emailPayload = {
-            to: EMAIL_CONFIG.to,
-            cc: EMAIL_CONFIG.cc,
+            to: toRecipients,
+            cc: ccRecipients,
             subject,
             html,
             text,
         };
 
-        console.log('[RESEND] Sending to:', EMAIL_CONFIG.to);
+        console.log('[RESEND] Sending to:', toRecipients);
+        console.log('[RESEND] CC:', ccRecipients);
         console.log('[RESEND] Subject:', subject);
 
         const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
