@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const requestSchema = z.object({
-    case_number: z.string().min(6, "Número de caso inválido (mínimo 6 dígitos)"),
+    case_number: z.string().min(1, "Número de caso requerido"),
     incident_at: z.string().optional(),
     ingress_at: z.string().optional(),
     ppu: z.string().min(4, "PPU requerida"),
