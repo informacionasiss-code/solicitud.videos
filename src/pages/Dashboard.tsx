@@ -138,25 +138,32 @@ export default function Dashboard() {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {kpis.map((item, i) => (
                     <div
                         key={i}
-                        className={`stat-card hover-lift bg-gradient-to-br ${item.bgGradient} group cursor-pointer`}
+                        className="card-premium p-6 relative overflow-hidden group hover:shadow-xl transition-all duration-300"
                         style={{ animationDelay: `${i * 100}ms` }}
                     >
-                        <div className="flex items-start justify-between">
+                        {/* Decorative background blob */}
+                        <div className={`absolute -right-6 -top-6 w-32 h-32 rounded-full opacity-10 bg-gradient-to-br ${item.gradient} transition-transform duration-500 group-hover:scale-150`} />
+
+                        <div className="relative flex items-center justify-between z-10">
                             <div>
-                                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{item.label}</p>
-                                <p className="text-4xl font-bold text-slate-900 dark:text-white">{item.value ?? "—"}</p>
+                                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{item.label}</p>
+                                <h3 className="text-4xl font-extrabold text-slate-900 dark:text-white mt-2">{item.value ?? 0}</h3>
                             </div>
-                            <div className={`stat-card-icon bg-gradient-to-br ${item.gradient} shadow-lg group-hover:scale-110 transition-transform`}>
-                                <item.icon className="h-5 w-5 text-white" />
+                            <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform duration-300`}>
+                                <item.icon className="h-7 w-7" />
                             </div>
                         </div>
-                        <div className="mt-4 flex items-center text-xs text-slate-500 dark:text-slate-400">
-                            <TrendingUp className="h-3 w-3 mr-1 text-emerald-500" />
-                            <span>Actualizado en tiempo real</span>
+
+                        <div className="mt-4 flex items-center justify-between text-xs relative z-10">
+                            <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full font-medium border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800">
+                                <TrendingUp className="h-3 w-3" />
+                                <span className="text-[10px]">ACTIVO</span>
+                            </span>
+                            <span className="text-slate-400 font-medium">Actualizado ahora</span>
                         </div>
                     </div>
                 ))}
