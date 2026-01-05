@@ -125,14 +125,17 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             const result: ParsedEml = {};
 
             const patterns = {
-                case_number: /Case number #(\d+)/i,
+                // More flexible case number patterns
+                case_number: /(?:Case\s*number|Caso|Solicitud)\s*(?:#|N°|:)?\s*(\d+)/i,
                 case_number_alt: /#\s*(\d{6,})/,
-                incident_at: /(?:Fecha del incidente|Fecha de Ocurrencia):\s*(.+)/i,
-                ingress_at: /(?:Fecha de ingreso|Fecha Ingreso):\s*(.+)/i,
-                ppu: /PPU:\s*([A-Z0-9]+)/i,
-                incident_point: /(?:Punto del incidente|Lugar):\s*(.+)/i,
-                reason: /(?:Motivo del descargo|Motivo):\s*(.+)/i,
-                detail: /(?:Detalle|Observaciones):\s*([\s\S]+?)(?:\n\s*\n|$)/i,
+
+                // More flexible headers with optional colons
+                incident_at: /(?:Fecha del incidente|Fecha de Ocurrencia|Fecha)\s*[:.]?\s*(.+)/i,
+                ingress_at: /(?:Fecha de ingreso|Fecha Ingreso|Ingreso)\s*[:.]?\s*(.+)/i,
+                ppu: /(?:PPU|Patente)\s*[:.]?\s*([A-Z0-9\-]+)/i,
+                incident_point: /(?:Punto del incidente|Lugar|Ubicaci[oó]n)\s*[:.]?\s*(.+)/i,
+                reason: /(?:Motivo del descargo|Motivo)\s*[:.]?\s*(.+)/i,
+                detail: /(?:Detalle|Observaciones|Descripci[oó]n)\s*[:.]?\s*([\s\S]+?)(?:\n\s*\n|$)/i,
             };
 
             const caseMatch = content.match(patterns.case_number) || content.match(patterns.case_number_alt);
