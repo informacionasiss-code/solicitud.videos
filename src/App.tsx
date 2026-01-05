@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Layout } from "@/components/layout/Layout";
+import { AdminLayout } from "@/layouts/AdminLayout";
+import { PublicLayout } from "@/layouts/PublicLayout";
+import { PortalDashboard } from "@/pages/portal/PortalDashboard";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -10,6 +12,7 @@ import Ingresos from "@/pages/Ingresos";
 import Registros from "@/pages/Registros";
 import Envios from "@/pages/Envios";
 import PPUAgrupados from "@/pages/PPUAgrupados";
+import BusesSinDisco from "@/pages/BusesSinDisco";
 
 const queryClient = new QueryClient();
 
@@ -39,14 +42,25 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/ingresos" element={<Ingresos />} />
-              <Route path="/registros" element={<Registros />} />
-              <Route path="/agrupados" element={<PPUAgrupados />} />
-              <Route path="/envios" element={<Envios />} />
-              <Route path="*" element={<Navigate to="/" />} />
+            {/* Public Portal Routes */}
+            <Route path="/portal" element={<PublicLayout />}>
+              <Route index element={<PortalDashboard />} />
             </Route>
+
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="ingresos" element={<Ingresos />} />
+              <Route path="registros" element={<Registros />} />
+              <Route path="agrupados" element={<PPUAgrupados />} />
+              <Route path="envios" element={<Envios />} />
+              <Route path="buses-sin-disco" element={<BusesSinDisco />} />
+            </Route>
+
+            {/* Root Redirect */}
+            <Route path="/" element={<Navigate to="/portal" replace />} />
+            <Route path="*" element={<Navigate to="/portal" replace />} />
           </Routes>
         </BrowserRouter>
         <Toaster
@@ -57,8 +71,10 @@ function App() {
             style: {
               background: 'hsl(var(--card))',
               border: '1px solid hsl(var(--border))',
-              color: 'hsl(var(--foreground))'
-            }
+              color: 'hsl(var(--foreground))',
+              fontFamily: 'var(--font-sans)',
+            },
+            className: 'glass'
           }}
         />
       </QueryClientProvider>
