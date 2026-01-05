@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
 import {
     LayoutDashboard,
@@ -8,24 +8,105 @@ import {
     Menu,
     X,
     Bus,
-    ShieldCheck
+    ShieldCheck,
+    FileInput,
+    Lock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
 
 export function AdminLayout() {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [password, setPassword] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const location = useLocation();
+
+    useEffect(() => {
+        const auth = sessionStorage.getItem("admin_auth");
+        if (auth === "true") {
+            setIsAuthenticated(true);
+        }
+        setIsLoading(false);
+    }, []);
+
+    const handleLogin = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (password === "Zulu2025") {
+            sessionStorage.setItem("admin_auth", "true");
+            setIsAuthenticated(true);
+            toast.success("Acceso concedido");
+        } else {
+            toast.error("Contraseña incorrecta");
+        }
+    };
+
+    const handleLogout = () => {
+        sessionStorage.removeItem("admin_auth");
+        setIsAuthenticated(false);
+        setPassword("");
+    };
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
     const menuItems = [
         { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
+        { icon: FileInput, label: "Nuevo Ingreso", path: "/admin/ingresos" }, // Restored Feature
         { icon: FileText, label: "Registros", path: "/admin/registros" },
         { icon: Users, label: "PPU Agrupados", path: "/admin/agrupados" },
         { icon: Send, label: "Envíos", path: "/admin/envios" },
-        { icon: Bus, label: "Buses Sin Disco", path: "/admin/buses-sin-disco" }, // New Feature
+        { icon: Bus, label: "Buses Sin Disco", path: "/admin/buses-sin-disco" },
     ];
+
+    if (isLoading) return null;
+
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-900 px-4">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+                >
+                    <div className="p-8 pb-0 text-center">
+                        <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/30">
+                            <Lock className="w-8 h-8 text-white" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-slate-900">Portal Administrativo</h2>
+                        <p className="text-slate-500 mt-2">Ingrese la clave de seguridad para continuar</p>
+                    </div>
+
+                    <form onSubmit={handleLogin} className="p-8">
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contraseña</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full mt-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                            >
+                                Ingresar
+                            </button>
+                        </div>
+                    </form>
+                    <div className="bg-slate-50 p-4 text-center border-t border-slate-100">
+                        <Link to="/portal" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                            &larr; Volver al Portal Público
+                        </Link>
+                    </div>
+                </motion.div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 flex">
@@ -76,15 +157,17 @@ export function AdminLayout() {
                             </nav>
 
                             <div className="mt-auto pt-6 border-t border-white/10">
-                                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/5">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-sm font-bold">
-                                        AD
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 transition-colors"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center text-xs font-bold">
+                                        LO
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-white">Administrador</p>
-                                        <p className="text-xs text-slate-400">admin@asiss.cl</p>
+                                    <div className="text-left">
+                                        <p className="text-sm font-medium">Cerrar Sesión</p>
                                     </div>
-                                </div>
+                                </button>
                             </div>
                         </div>
                     </motion.aside>
