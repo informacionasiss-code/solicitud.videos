@@ -141,7 +141,7 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
                 ppu: /(?:PPU|Patente)\s*[:.]?\s*([A-Z0-9\-]+)/i,
                 incident_point: /(?:Punto del incidente|Lugar|Ubicaci[oó]n)\s*[:.]?\s*(.+)/i,
                 reason: /(?:Motivo del descargo|Motivo)\s*[:.]?\s*(.+)/i,
-                detail: /(?:Detalle|Observaciones|Descripci[oó]n)\s*[:.]?\s*([\s\S]+?)(?:\n\s*\n|$)/i,
+                detail: /(?:Detalle|Observaciones|Descripci[oó]n)\s*[:.]\s*([\s\S]+?)(?:\n\s*\n|$)/i,
             };
 
             const caseMatch = content.match(patterns.case_number) || content.match(patterns.case_number_alt);
