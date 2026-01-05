@@ -136,7 +136,7 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
                 case_number_alt: /#\s*(\d{6,})/,
 
                 // More flexible headers with optional colons
-                incident_at: /(?:Fecha\s*(?:del?)?\s*incidente|Fecha\s*de\s*Ocurrencia|Fecha)\s*[:.]?\s*(.+)/i,
+                incident_at: /(?:Fecha\s*(?:del?)?\s*incidente|Fecha\s*de\s*Ocurrencia)\s*[:.]?\s*(.+)/i,
                 ingress_at: /(?:Fecha\s*de\s*ingreso|Fecha\s*Ingreso|Ingreso)\s*[:.]?\s*(.+)/i,
                 ppu: /(?:PPU|Patente)\s*[:.]?\s*([A-Z0-9\-]+)/i,
                 incident_point: /(?:Punto del incidente|Lugar|Ubicaci[oó]n)\s*[:.]?\s*(.+)/i,
