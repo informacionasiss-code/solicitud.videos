@@ -25,14 +25,20 @@ function parseSpanishDate(dateStr: string): string | undefined {
     const cleanStr = dateStr.trim().replace(/\s+/g, ' ');
 
     const formats = [
+        "dd/MM/yyyy HH:mm:ss", // Added seconds support
         "dd/MM/yyyy HH:mm",
         "dd/MM/yyyy",
+        "dd-MM-yyyy HH:mm:ss",
         "dd-MM-yyyy HH:mm",
         "dd-MM-yyyy",
+        "yyyy-MM-dd HH:mm:ss",
         "yyyy-MM-dd HH:mm",
         "yyyy-MM-dd",
         "EEEE d 'de' MMMM 'de' yyyy",
         "d 'de' MMMM 'de' yyyy",
+        "d/MM/yyyy", // Single digit day support
+        "dd/M/yyyy", // Single digit month support
+        "d/M/yyyy",
     ];
 
     for (const fmt of formats) {
@@ -126,12 +132,12 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
 
             const patterns = {
                 // More flexible case number patterns
-                case_number: /(?:Case\s*number|Caso|Solicitud)\s*(?:#|N°|:)?\s*(\d+)/i,
+                case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso)\s*(?:#|N°|:)?\s*(\d+)/i,
                 case_number_alt: /#\s*(\d{6,})/,
 
                 // More flexible headers with optional colons
-                incident_at: /(?:Fecha del incidente|Fecha de Ocurrencia|Fecha)\s*[:.]?\s*(.+)/i,
-                ingress_at: /(?:Fecha de ingreso|Fecha Ingreso|Ingreso)\s*[:.]?\s*(.+)/i,
+                incident_at: /(?:Fecha\s*(?:del?)?\s*incidente|Fecha\s*de\s*Ocurrencia|Fecha)\s*[:.]?\s*(.+)/i,
+                ingress_at: /(?:Fecha\s*de\s*ingreso|Fecha\s*Ingreso|Ingreso)\s*[:.]?\s*(.+)/i,
                 ppu: /(?:PPU|Patente)\s*[:.]?\s*([A-Z0-9\-]+)/i,
                 incident_point: /(?:Punto del incidente|Lugar|Ubicaci[oó]n)\s*[:.]?\s*(.+)/i,
                 reason: /(?:Motivo del descargo|Motivo)\s*[:.]?\s*(.+)/i,
