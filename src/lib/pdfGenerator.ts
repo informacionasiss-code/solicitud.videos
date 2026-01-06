@@ -23,7 +23,6 @@ export function generatePendingPPUsPDF(requests: PendingRequest[]) {
     // Colors
     const primaryColor: [number, number, number] = [59, 130, 246]; // Blue-500
     const darkColor: [number, number, number] = [30, 41, 59]; // Slate-800
-    const lightGray: [number, number, number] = [241, 245, 249]; // Slate-100
     const mediumGray: [number, number, number] = [100, 116, 139]; // Slate-500
     const warningColor: [number, number, number] = [245, 158, 11]; // Amber-500
 
@@ -64,52 +63,59 @@ export function generatePendingPPUsPDF(requests: PendingRequest[]) {
 
     // Content area
     let yPos = 55;
+    let col = 0;
 
     // Calculate grid layout
-    const columns = 5;
+    const columns = 6; // Increased columns for clearer fit
     const cellWidth = contentWidth / columns;
-    const cellHeight = 18;
-    const cellPadding = 3;
+    const cellHeight = 12; // Reduced height for compactness
 
     // Draw PPU grid (unique PPUs only)
-    uniquePPUs.forEach((item, index) => {
-        const col = index % columns;
-        const row = Math.floor(index / columns);
-        const xPos = margin + (col * cellWidth);
-        const currentY = yPos + (row * cellHeight);
-
-        // Check if we need a new page
-        if (currentY + cellHeight > pageHeight - 30) {
+    uniquePPUs.forEach((item) => {
+        // Check availability strictly before drawing
+        if (yPos + cellHeight > pageHeight - 10) {
             doc.addPage();
             yPos = 20;
-            return;
+            col = 0;
         }
 
-        // Cell background - alternating colors
-        if (row % 2 === 0) {
-            doc.setFillColor(...lightGray);
-        } else {
-            doc.setFillColor(255, 255, 255);
-        }
-        doc.rect(xPos, currentY, cellWidth, cellHeight, 'F');
+        const xPos = margin + (col * cellWidth);
+
+        // Cell background - alternating colors based on absolute index is tricky with pagination
+        // Simple alternate based on col/row visualization
+        // We can just use white for cleaner compact look or very light gray
+        doc.setFillColor(255, 255, 255);
+        doc.rect(xPos, yPos, cellWidth, cellHeight, 'F');
 
         // Cell border
         doc.setDrawColor(226, 232, 240); // Slate-200
-        doc.setLineWidth(0.3);
-        doc.rect(xPos, currentY, cellWidth, cellHeight, 'S');
+        doc.setLineWidth(0.2);
+        doc.rect(xPos, yPos, cellWidth, cellHeight, 'S');
 
         // PPU text (main, bold)
         doc.setTextColor(...darkColor);
-        doc.setFontSize(12);
+        doc.setFontSize(10); // Slightly smaller font
         doc.setFont('helvetica', 'bold');
-        doc.text(item.ppu, xPos + cellPadding, currentY + 10);
+        const textWidth = doc.getTextWidth(item.ppu);
+        const textX = xPos + (cellWidth - textWidth) / 2; // Center horizontally
+        doc.text(item.ppu, textX, yPos + 6); // Center vertically approx
 
         // Show case count if more than 1
         if (item.count > 1) {
             doc.setTextColor(...warningColor);
             doc.setFontSize(7);
             doc.setFont('helvetica', 'bold');
-            doc.text(`(${item.count} casos)`, xPos + cellPadding, currentY + 15);
+            const countText = `(${item.count} casos)`;
+            const countWidth = doc.getTextWidth(countText);
+            const countX = xPos + (cellWidth - countWidth) / 2;
+            doc.text(countText, countX, yPos + 10);
+        }
+
+        // Increment cursor
+        col++;
+        if (col >= columns) {
+            col = 0;
+            yPos += cellHeight;
         }
     });
 
