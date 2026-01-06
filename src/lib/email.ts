@@ -41,13 +41,31 @@ Saludos cordiales.
 
 // Generate HTML version for Resend - Professional Corporate Design
 export const generateEmailHtml = (request: any) => {
-    const incidentDate = request.incident_at ? new Date(request.incident_at).toLocaleString('es-CL') : 'N/A';
+    // Safe Date Parsing
+    let incidentDate = 'N/A';
+    try {
+        if (request.incident_at) {
+            incidentDate = new Date(request.incident_at).toLocaleString('es-CL');
+        }
+    } catch (e) {
+        console.warn('[EMAIL] Date parsing failed', e);
+        incidentDate = String(request.incident_at || 'N/A');
+    }
 
-    // Status Logic for Badge
+    // Status Logic for Badge (Robust)
     const getStatusBadge = () => {
-        if (request.video_url) return '<span style="background-color: #ecfdf5; color: #047857; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; border: 1px solid #a7f3d0; letter-spacing: 0.5px; white-space: nowrap;">VIDEO DISPONIBLE</span>';
-        if (request.failure_type || (!request.video_url && ["enviado", "revisado"].includes(request.status))) return '<span style="background-color: #fef2f2; color: #b91c1c; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; border: 1px solid #fecaca; letter-spacing: 0.5px; white-space: nowrap;">NO DISPONIBLE</span>';
-        return '<span style="background-color: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; border: 1px solid #e2e8f0; letter-spacing: 0.5px; white-space: nowrap;">PENDIENTE</span>';
+        try {
+            if (request.video_url) return '<span style="background-color: #ecfdf5; color: #047857; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; border: 1px solid #a7f3d0; letter-spacing: 0.5px; white-space: nowrap;">VIDEO DISPONIBLE</span>';
+            const status = request.status || 'pendiente';
+            const failure = request.failure_type;
+
+            if (failure || (!request.video_url && ["enviado", "revisado"].includes(status))) {
+                return '<span style="background-color: #fef2f2; color: #b91c1c; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; border: 1px solid #fecaca; letter-spacing: 0.5px; white-space: nowrap;">NO DISPONIBLE</span>';
+            }
+            return '<span style="background-color: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; border: 1px solid #e2e8f0; letter-spacing: 0.5px; white-space: nowrap;">PENDIENTE</span>';
+        } catch (error) {
+            return '<span style="background-color: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; border: 1px solid #e2e8f0; letter-spacing: 0.5px; white-space: nowrap;">ESTADO</span>';
+        }
     };
 
     return `
