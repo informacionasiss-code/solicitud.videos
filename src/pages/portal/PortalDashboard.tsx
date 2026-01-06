@@ -364,7 +364,7 @@ export function PortalDashboard() {
                                     {searchResult.operator_name && (
                                         <div className="flex items-center justify-between px-4 py-3 bg-slate-100 rounded-xl text-xs text-slate-500">
                                             <span>Gestionado por:</span>
-                                            <span className="font-bold text-slate-700 uppercase">{searchResult.operator_name}</span>
+                                            <span className="font-bold text-slate-700 uppercase">US EL ROBLE</span>
                                         </div>
                                     )}
                                 </div>
