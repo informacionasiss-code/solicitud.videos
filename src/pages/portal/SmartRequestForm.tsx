@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { sendEmailViaResend } from "@/lib/email";
 
 // Validation Schema
 const requestSchema = z.object({
@@ -98,20 +99,14 @@ export function SmartRequestForm() {
             if (error) throw error;
 
             // Send Email Notification
-            // We wrap this in try-catch so it doesn't block the UI success if email services are down/slow
             try {
-                // Using the existing email logic, but we might need to adapt it. 
-                // For now triggering a basic notification if possible.
-                // NOTE: The previous logic was complex. We will try to call the backend function or rely on triggers if set up.
-                // Currently user has 'emailService' in src/lib/email.ts. Let's try to use it.
-                // Wait, the client-side email service sends form data. We just sent raw JSON.
-                // We might need to construct the email object.
-                // For redundancy, we'll try to invoke the send-email edge function or just rely on the table trigger if it exists.
-                // If "sendBackupEmails" is what we used before, let's skip complex calls here to avoid regression errors 
-                // and rely on the admin panel to dispatch "Enviado" emails later.
-
-                // User said: "quiero que cuando algan una solicitud esta ya notique que el bus no tiene disco"
-                // This implies immediate feedback, which we are giving via UI. 
+                // Explicitly send email via Resend
+                const emailResult = await sendEmailViaResend(payload);
+                if (emailResult.success) {
+                    console.log("[EMAIL] Notification sent successfully");
+                } else {
+                    console.warn("[EMAIL] Failed to send notification:", emailResult.message);
+                }
             } catch (e) {
                 console.warn("Email trigger warning:", e);
             }
