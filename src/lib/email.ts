@@ -43,223 +43,94 @@ Saludos cordiales.
 export const generateEmailHtml = (request: any) => {
     const incidentDate = request.incident_at ? new Date(request.incident_at).toLocaleString('es-CL') : 'N/A';
 
+    // Status Logic for Badge
+    const getStatusBadge = () => {
+        if (request.video_url) return '<span style="background-color: #ecfdf5; color: #047857; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; border: 1px solid #a7f3d0; letter-spacing: 0.5px; white-space: nowrap;">VIDEO DISPONIBLE</span>';
+        if (request.failure_type || (!request.video_url && ["enviado", "revisado"].includes(request.status))) return '<span style="background-color: #fef2f2; color: #b91c1c; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; border: 1px solid #fecaca; letter-spacing: 0.5px; white-space: nowrap;">NO DISPONIBLE</span>';
+        return '<span style="background-color: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; border: 1px solid #e2e8f0; letter-spacing: 0.5px; white-space: nowrap;">PENDIENTE</span>';
+    };
+
     return `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            line-height: 1.7; 
-            color: #374151; 
-            margin: 0;
-            padding: 0;
-            background-color: #f3f4f6;
-        }
-        .wrapper {
-            background-color: #f3f4f6;
-            padding: 16px 12px;
-        }
-        .container { 
-            max-width: 640px; 
-            margin: 0 auto; 
-            background: #ffffff;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-        .header { 
-            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%); 
-            color: white; 
-            padding: 20px 32px;
-            text-align: center;
-        }
-        .header-icon {
-            width: 60px;
-            height: 60px;
-            background: rgba(255,255,255,0.15);
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 16px;
-            font-size: 28px;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 22px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .header .case-number {
-            margin: 12px 0 0 0;
-            font-size: 15px;
-            opacity: 0.9;
-            font-weight: 500;
-        }
-        .content { 
-            padding: 16px 32px;
-        }
-        .greeting {
-            font-size: 16px;
-            color: #374151;
-            margin-bottom: 16px;
-        }
-        .info-grid {
-            background: #f8fafc;
-            border-radius: 10px;
-            padding: 24px;
-            margin: 24px 0;
-            border: 1px solid #e2e8f0;
-        }
-        .info-row {
-            display: flex;
-            padding: 12px 0;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .info-row:last-child {
-            border-bottom: none;
-        }
-        .info-label {
-            width: 160px;
-            font-weight: 600;
-            color: #1e40af;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-        .info-value {
-            flex: 1;
-            color: #1f2937;
-            font-size: 15px;
-        }
-        .info-value.highlight {
-            font-weight: 700;
-            font-size: 17px;
-            color: #111827;
-        }
-        .detail-section {
-            background: #ffffff;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            padding: 24px;
-            margin: 24px 0;
-        }
-        .detail-title {
-            font-weight: 700;
-            color: #1e40af;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #dbeafe;
-        }
-        .detail-content {
-            color: #4b5563;
-            font-size: 14px;
-            line-height: 1.8;
-        }
-        .video-section {
-            background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
-            border-radius: 10px;
-            padding: 20px 24px;
-            margin: 24px 0;
-            border: 1px solid #bfdbfe;
-        }
-        .video-label {
-            font-weight: 600;
-            color: #1e40af;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            margin-bottom: 8px;
-        }
-        .video-link {
-            color: #1d4ed8;
-            text-decoration: none;
-            font-weight: 500;
-            word-break: break-all;
-        }
-        .video-link:hover {
-            text-decoration: underline;
-        }
-        .closing {
-            margin-top: 32px;
-            color: #6b7280;
-            font-size: 15px;
-        }
-        .footer { 
-            background: #111827; 
-            color: #9ca3af; 
-            padding: 24px 40px;
-            text-align: center;
-        }
-        .footer-brand {
-            font-weight: 700;
-            color: #ffffff;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
-        }
-        .footer-text {
-            font-size: 12px;
-            color: #6b7280;
-        }
-    </style>
+    <title>Reporte de Extracción</title>
 </head>
-<body>
-    <div class="wrapper">
-        <div class="container">
-            <div class="header">
-                <div class="header-icon">▶</div>
-                <h1>Extracción de Video</h1>
-                <p class="case-number">Caso N° ${request.case_number || 'N/A'}</p>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); margin-top: 40px; margin-bottom: 40px;">
+        
+        <!-- HEADER -->
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px 40px; text-align: center; border-bottom: 1px solid #334155;">
+            <div style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 6px;">US EL ROBLE</div>
+            <div style="color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">Gestión de Evidencia Digital</div>
+        </div>
+
+        <!-- HERO SECTION -->
+        <div style="padding: 32px 40px 24px 40px; border-bottom: 1px solid #f1f5f9;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h1 style="margin: 0; color: #0f172a; font-size: 20px; font-weight: 700;">Reporte de Extracción</h1>
+                ${getStatusBadge()}
             </div>
-            <div class="content">
-                <p class="greeting">Estimados,</p>
-                <p>Junto con saludar, informo extracción de videos para el caso N° <strong>${request.case_number || 'N/A'}</strong>:</p>
-                
-                <div class="info-grid">
-                    <div class="info-row">
-                        <div class="info-label">N° Caso</div>
-                        <div class="info-value">${request.case_number || 'N/A'}</div>
-                    </div>
-                    <div class="info-row">
-                        <div class="info-label">Patente (PPU)</div>
-                        <div class="info-value highlight">${request.ppu || 'N/A'}</div>
-                    </div>
-                    <div class="info-row">
-                        <div class="info-label">Fecha Incidente</div>
-                        <div class="info-value">${incidentDate}</div>
-                    </div>
-                    <div class="info-row">
-                        <div class="info-label">Ubicación</div>
-                        <div class="info-value">${request.incident_point || 'N/A'}</div>
-                    </div>
-                    <div class="info-row">
-                        <div class="info-label">Motivo</div>
-                        <div class="info-value">${request.reason || 'N/A'}</div>
-                    </div>
+            <p style="margin: 0; color: #64748b; font-size: 15px; line-height: 1.6;">
+                Se ha generado un nuevo reporte de extracción de video asociado al caso <strong>#${request.case_number || 'S/N'}</strong>.
+            </p>
+        </div>
+
+        <!-- DATA GRID -->
+        <div style="padding: 0 40px; background-color: #f8fafc;">
+            <table style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                <tr>
+                    <td style="padding: 20px 0; border-bottom: 1px solid #e2e8f0; width: 35%;">
+                         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">N° Caso</div>
+                        <div style="font-size: 15px; font-weight: 600; color: #0f172a; margin-top: 4px;">#${request.case_number || '—'}</div>
+                    </td>
+                    <td style="padding: 20px 0; border-bottom: 1px solid #e2e8f0;">
+                         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Fecha Incidente</div>
+                        <div style="font-size: 15px; font-weight: 600; color: #0f172a; margin-top: 4px;">${incidentDate}</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 20px 0; border-bottom: 1px solid #e2e8f0;">
+                         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Patente (PPU)</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #2563eb; margin-top: 4px;">${request.ppu || '—'}</div>
+                    </td>
+                    <td style="padding: 20px 0; border-bottom: 1px solid #e2e8f0;">
+                         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Ubicación</div>
+                        <div style="font-size: 14px; font-weight: 500; color: #334155; margin-top: 4px;">${request.incident_point || 'Sin ubicación registrada'}</div>
+                    </td>
+                </tr>
+                 <tr>
+                    <td colspan="2" style="padding: 20px 0;">
+                         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Motivo</div>
+                        <div style="font-size: 14px; font-weight: 500; color: #334155; margin-top: 4px;">${request.reason || 'Sin motivo registrado'}</div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- DETAILS & ACTIONS -->
+        <div style="padding: 32px 40px; background-color: #ffffff;">
+            
+            <div style="margin-bottom: 32px;">
+                <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 12px; border-left: 4px solid #2563eb; padding-left: 12px;">Detalle del Incidente</div>
+                <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 14px; color: #475569; line-height: 1.6;">
+                    ${(request.detail || 'Sin detalles adicionales.').replace(/\n/g, '<br>')}
                 </div>
-                
-                <div class="detail-section">
-                    <div class="detail-title">Detalle del Incidente</div>
-                    <div class="detail-content">
-                        ${(request.detail || 'Sin detalle disponible').replace(/\n/g, '<br>')}
-                    </div>
-                </div>
-                
-                <div class="video-section">
-                    <div class="video-label">Enlace al Video</div>
-                    ${request.video_url
-            ? `<a href="${request.video_url}" class="video-link">${request.video_url}</a>`
-            : `<div style="color: #991b1b; font-weight: 600; line-height: 1.8;">
-                ${(() => {
+            </div>
+
+            ${request.video_url ?
+            `<div style="text-align: center; margin-top: 40px;">
+                <a href="${request.video_url}" target="_blank" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 16px 32px; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.2); transition: all 0.2s;">
+                    📥 Descargar Evidencia de Video
+                </a>
+                <p style="margin-top: 16px; font-size: 12px; color: #94a3b8;">Enlace seguro de descarga directa</p>
+            </div>` :
+            `<div style="background-color: #fff1f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; text-align: center;">
+                 <div style="color: #be123c; font-weight: 700; font-size: 15px; margin-bottom: 4px;">Evidencia No Disponible</div>
+                 <div style="color: #881337; font-size: 13px;">
+                    ${(() => {
                 const failureLabel = request.failure_type
                     ? (request.failure_type === 'disco_danado' ? 'Disco Dañado' :
                         request.failure_type === 'bus_sin_disco' ? 'Bus Sin Disco' :
@@ -267,32 +138,33 @@ export const generateEmailHtml = (request: any) => {
                                 request.failure_type === 'error_lectura' ? 'Error de Lectura' :
                                     request.failure_type === 'no_disponible' ? 'No Disponible' :
                                         request.failure_type)
-                    : null;
-
-                if (failureLabel && request.obs) {
-                    return `⚠️ VIDEO NO DISPONIBLE: ${failureLabel}<br><span style="font-weight: 400; color: #6b7280;">📝 Observación: ${request.obs}</span>`;
-                } else if (failureLabel) {
-                    return `⚠️ VIDEO NO DISPONIBLE: ${failureLabel}`;
-                } else if (request.obs) {
-                    return `⚠️ OBSERVACIÓN: ${request.obs}`;
-                } else {
-                    return '<span style="color: #6b7280; font-style: italic; font-weight: 400;">Pendiente de extracción</span>';
-                }
+                    : 'Motivo no especificado';
+                return `Razón: ${failureLabel} ${request.obs ? `<br>Observación: ${request.obs}` : ''}`;
             })()}
-               </div>`}
-                </div>
-                
-                <p class="closing">Saludos cordiales.</p>
+                 </div>
+            </div>`
+        }
+
+        </div>
+
+        <!-- FOOTER -->
+        <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 32px 40px; text-align: center;">
+            <div style="margin-bottom: 12px;">
+                <span style="font-weight: 700; color: #0f172a; font-size: 14px;">US EL ROBLE</span>
             </div>
-            <div class="footer">
-                <div class="footer-brand">Extracción Videos El Roble</div>
-                <div class="footer-text">Sistema de Gestión de Extracción de Videos</div>
+            <p style="font-size: 11px; color: #94a3b8; line-height: 1.5; margin: 0;">
+                Este correo electrónico es generado automáticamente. Por favor no responder a esta dirección.<br>
+                La información contenida en este mensaje es confidencial y exclusiva para el destinatario.
+            </p>
+            <div style="margin-top: 24px; font-size: 11px; color: #cbd5e1;">
+                © ${new Date().getFullYear()} Sistema de Gestión de Videos
             </div>
         </div>
+
     </div>
 </body>
 </html>
-`;
+    `;
 };
 
 export const getMailtoUrl = (request: any) => {
