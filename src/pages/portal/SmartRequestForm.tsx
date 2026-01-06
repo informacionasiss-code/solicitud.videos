@@ -91,7 +91,6 @@ export function SmartRequestForm() {
                 ...data,
                 failure_type: failure_type,
                 status: 'pendiente', // Always pending initially, admin reviews it
-                source: 'portal_web' // Tag source
             };
 
             const { error } = await supabase.from("solicitudes").insert([payload]);
