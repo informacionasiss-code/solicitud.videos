@@ -161,50 +161,115 @@ export function PortalDashboard() {
                                 </button>
                             </div>
 
-                            <div className="p-6 space-y-4">
-                                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-                                    <span className="text-sm font-medium text-slate-600">Estado Actual</span>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${getStatusColor(searchResult.status)}`}>
-                                        {getStatusLabel(searchResult.status)}
-                                    </span>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <div className="flex items-start gap-3">
-                                        <Clock className="w-5 h-5 text-slate-400 mt-0.5" />
+                            <div className="max-h-[80vh] overflow-y-auto custom-scrollbar">
+                                <div className="p-6 space-y-6">
+                                    {/* Status Section */}
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
                                         <div>
-                                            <p className="text-sm font-medium text-slate-700">Fecha de Solicitud</p>
-                                            <p className="text-sm text-slate-500">
-                                                {format(new Date(searchResult.created_at), "d 'de' MMMM, yyyy - HH:mm", { locale: es })}
+                                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Estado Actual</span>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className={`w-3 h-3 rounded-full ${getStatusColor(searchResult.status).replace('text-', 'bg-').split(' ')[0].replace('600', '500')}`} />
+                                                <span className="text-lg font-bold text-slate-800">
+                                                    {getStatusLabel(searchResult.status)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Key Dates Grid */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
+                                            <div className="flex items-center gap-2 mb-1 text-indigo-700">
+                                                <Clock className="w-4 h-4" />
+                                                <span className="text-xs font-bold uppercase">Solicitado el</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-slate-700">
+                                                {searchResult.created_at ? format(new Date(searchResult.created_at), "dd MMM yyyy, HH:mm", { locale: es }) : '-'}
+                                            </p>
+                                        </div>
+                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                            <div className="flex items-center gap-2 mb-1 text-slate-500">
+                                                <AlertCircle className="w-4 h-4" />
+                                                <span className="text-xs font-bold uppercase">Fecha Incidente</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-slate-700">
+                                                {searchResult.incident_at ? format(new Date(searchResult.incident_at), "dd MMM yyyy, HH:mm", { locale: es }) : 'No indicada'}
                                             </p>
                                         </div>
                                     </div>
 
-                                    <div className="flex items-start gap-3">
-                                        <CheckCircle2 className="w-5 h-5 text-slate-400 mt-0.5" />
+                                    {/* Detailed Info */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-bold text-slate-900 border-b pb-2">Información del Caso</h4>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-xs text-slate-500 font-medium">PPU / Patente</p>
+                                                <p className="text-base font-semibold text-slate-800">{searchResult.ppu}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-slate-500 font-medium">Motivo</p>
+                                                <p className="text-base font-semibold text-slate-800">{searchResult.reason || 'No especificado'}</p>
+                                            </div>
+                                        </div>
+
                                         <div>
-                                            <p className="text-sm font-medium text-slate-700">PPU Solicitada</p>
-                                            <p className="text-sm text-slate-500">{searchResult.ppu}</p>
+                                            <p className="text-xs text-slate-500 font-medium">Lugar del Incidente</p>
+                                            <p className="text-sm text-slate-700 mt-1">{searchResult.incident_point || 'No especificado'}</p>
+                                        </div>
+
+                                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                            <p className="text-xs text-slate-500 font-medium mb-1">Descripción / Detalle</p>
+                                            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                                {searchResult.detail || 'Sin detalles adicionales.'}
+                                            </p>
                                         </div>
                                     </div>
 
-                                    {searchResult.status === 'enviado' && (
-                                        <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-sm text-emerald-700 flex gap-2">
-                                            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                                            <span>
-                                                Su solicitud ya fue enviada. Por favor revise su correo electrónico (incluyendo la carpeta de SPAM).
-                                            </span>
-                                        </div>
-                                    )}
+                                    {/* Resolution / Status Messages */}
+                                    <div className="space-y-3 pt-2">
+                                        {searchResult.status === 'enviado' && (
+                                            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex gap-3 text-emerald-800">
+                                                <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5 text-emerald-600" />
+                                                <div>
+                                                    <p className="font-bold text-sm">¡Solicitud Completada!</p>
+                                                    <p className="text-sm mt-1 opacity-90">
+                                                        Los registros han sido enviados exitosamente. Por favor revise su bandeja de entrada (y SPAM).
+                                                    </p>
+                                                    {searchResult.obs && (
+                                                        <div className="mt-2 pt-2 border-t border-emerald-200/50">
+                                                            <p className="text-xs font-bold uppercase opacity-80">Observación del Operador:</p>
+                                                            <p className="text-sm mt-0.5">{searchResult.obs}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
 
-                                    {searchResult.failure_type && (
-                                        <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm text-amber-700 flex gap-2">
-                                            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-                                            <span>
-                                                <strong>Observación:</strong> {searchResult.failure_type.replace(/_/g, ' ')}
-                                            </span>
-                                        </div>
-                                    )}
+                                        {searchResult.status === 'pendiente_envio' && (
+                                            <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex gap-3 text-indigo-800">
+                                                <Clock className="w-5 h-5 flex-shrink-0 mt-0.5 text-indigo-600" />
+                                                <div>
+                                                    <p className="font-bold text-sm">Listo para Enviar</p>
+                                                    <p className="text-sm mt-1 opacity-90">
+                                                        Su solicitud ha sido aprobada y procesada. Estamos preparando el envío final de los archivos.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {searchResult.failure_type && (
+                                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex gap-3 text-amber-800">
+                                                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600" />
+                                                <div>
+                                                    <p className="font-bold text-sm">Reporte de Falla</p>
+                                                    <p className="text-sm mt-1 opacity-90">
+                                                        Existe una observación técnica: <strong>{searchResult.failure_type.replace(/_/g, ' ')}</strong>.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
