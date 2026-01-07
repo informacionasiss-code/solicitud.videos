@@ -39,7 +39,7 @@ Saludos cordiales.
 `;
 };
 
-// Generate HTML version for Resend - Corporate Safe Design (High Deliverability)
+// Generate HTML version for Resend - Enterprise Safe Design (Premium & Deliverable)
 export const generateEmailHtml = (request: any) => {
     // Safe Date Parsing
     let incidentDate = 'N/A';
@@ -52,19 +52,43 @@ export const generateEmailHtml = (request: any) => {
         incidentDate = String(request.incident_at || 'N/A');
     }
 
-    // Simplified Status Badge (Text-based for safety)
-    const getStatusBadge = () => {
+    // Badge Logic (Table-based for compatibility)
+    const getStatusContent = () => {
         try {
-            if (request.video_url) return '<strong style="color: #047857;">[VIDEO DISPONIBLE]</strong>';
+            if (request.video_url) {
+                return `
+                <table border="0" cellspacing="0" cellpadding="0">
+                    <tr>
+                        <td style="background-color: #d1fae5; color: #065f46; border: 1px solid #34d399; padding: 6px 12px; border-radius: 16px; font-size: 11px; font-weight: bold; text-transform: uppercase; font-family: Helvetica, Arial, sans-serif;">
+                            ✓ Video Disponible
+                        </td>
+                    </tr>
+                </table>`;
+            }
+
             const status = request.status || 'pendiente';
             const failure = request.failure_type;
 
             if (failure || (!request.video_url && ["enviado", "revisado"].includes(status))) {
-                return '<strong style="color: #b91c1c;">[NO DISPONIBLE]</strong>';
+                return `
+                <table border="0" cellspacing="0" cellpadding="0">
+                    <tr>
+                        <td style="background-color: #fee2e2; color: #991b1b; border: 1px solid #f87171; padding: 6px 12px; border-radius: 16px; font-size: 11px; font-weight: bold; text-transform: uppercase; font-family: Helvetica, Arial, sans-serif;">
+                            ✕ No Disponible
+                        </td>
+                    </tr>
+                </table>`;
             }
-            return '<strong style="color: #475569;">[PENDIENTE]</strong>';
+            return `
+            <table border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                    <td style="background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 16px; font-size: 11px; font-weight: bold; text-transform: uppercase; font-family: Helvetica, Arial, sans-serif;">
+                        Pendiente
+                    </td>
+                </tr>
+            </table>`;
         } catch (error) {
-            return '<strong>[ESTADO]</strong>';
+            return '<span style="color: #64748b; font-weight: bold;"> ESTADO </span>';
         }
     };
 
@@ -73,71 +97,151 @@ export const generateEmailHtml = (request: any) => {
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Reporte de Extracción</title>
 </head>
-<body style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #333333; margin: 0; padding: 0;">
-    <div style="padding: 20px; background-color: #ffffff; max-width: 600px; border: 1px solid #dddddd;">
-        
-        <!-- Header Simple -->
-        <div style="border-bottom: 2px solid #000066; padding-bottom: 10px; margin-bottom: 20px;">
-            <h2 style="margin: 0; color: #000066; font-size: 18px;">Solicitud de Video - US EL ROBLE</h2>
-            <p style="margin: 5px 0 0; font-size: 12px; color: #666666;">Sistema de Gestión de Evidencia Digital</p>
-        </div>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+    
+    <!-- Outer Container -->
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f3f4f6; padding: 40px 0;">
+        <tr>
+            <td align="center">
+                <!-- Main Card -->
+                <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border: 1px solid #e5e7eb;">
+                    
+                    <!-- Header (Solid Blue - Safe) -->
+                    <tr>
+                        <td style="background-color: #1e3a8a; padding: 32px 40px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">US El Roble</h1>
+                            <p style="margin: 8px 0 0 0; color: #bfdbfe; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">Gestión de Evidencia Digital</p>
+                        </td>
+                    </tr>
 
-        <p style="font-size: 14px; line-height: 1.5;">
-            Estimados,<br><br>
-            Se ha generado un nuevo reporte de extracción de video para el caso <strong>#${request.case_number || 'S/N'}</strong>.
-            Estado actual: ${getStatusBadge()}
-        </p>
+                    <!-- Intro Section -->
+                    <tr>
+                        <td style="padding: 32px 40px 20px 40px; background-color: #ffffff;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td>
+                                        <h2 style="margin: 0; color: #111827; font-size: 20px; font-weight: 700; margin-bottom: 4px;">Solicitud de Video</h2>
+                                        <p style="margin: 0; color: #6b7280; font-size: 15px;">Caso Investigativo <strong>#${request.case_number || 'S/N'}</strong></p>
+                                    </td>
+                                    <td align="right" style="vertical-align: top;">
+                                        ${getStatusContent()}
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin-top: 24px; color: #374151; font-size: 15px; line-height: 1.6;">
+                                Estimados, se adjuntan los antecedentes actualizados de la solicitud de video.
+                            </p>
+                        </td>
+                    </tr>
 
-        <!-- Tabla de Datos -->
-        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
-            <tr>
-                <td style="padding: 8px; border: 1px solid #dddddd; background-color: #f9f9f9; width: 30%; font-weight: bold;">N° Caso:</td>
-                <td style="padding: 8px; border: 1px solid #dddddd;">${request.case_number || '—'}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border: 1px solid #dddddd; background-color: #f9f9f9; font-weight: bold;">Fecha Incidente:</td>
-                <td style="padding: 8px; border: 1px solid #dddddd;">${incidentDate}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border: 1px solid #dddddd; background-color: #f9f9f9; font-weight: bold;">Patente (PPU):</td>
-                <td style="padding: 8px; border: 1px solid #dddddd;"><strong>${request.ppu || '—'}</strong></td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border: 1px solid #dddddd; background-color: #f9f9f9; font-weight: bold;">Ubicación:</td>
-                <td style="padding: 8px; border: 1px solid #dddddd;">${request.incident_point || 'No registrada'}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border: 1px solid #dddddd; background-color: #f9f9f9; font-weight: bold;">Motivo:</td>
-                <td style="padding: 8px; border: 1px solid #dddddd;">${request.reason || 'No registrado'}</td>
-            </tr>
-        </table>
+                    <!-- Data Grid (Clean Table) -->
+                    <tr>
+                        <td style="padding: 0 40px 30px 40px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                                <tr>
+                                    <td width="30%" style="background-color: #f9fafb; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; color: #4b5563; font-size: 12px; font-weight: 700; text-transform: uppercase;">N° Caso</td>
+                                    <td width="70%" style="background-color: #ffffff; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #111827; font-size: 14px; font-weight: 600;">#${request.case_number || '—'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f9fafb; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; color: #4b5563; font-size: 12px; font-weight: 700; text-transform: uppercase;">Fecha Incidente</td>
+                                    <td style="background-color: #ffffff; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #111827; font-size: 14px;">${incidentDate}</td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f9fafb; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; color: #4b5563; font-size: 12px; font-weight: 700; text-transform: uppercase;">Patente (PPU)</td>
+                                    <td style="background-color: #ffffff; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #1e40af; font-size: 15px; font-weight: 700;">${request.ppu || '—'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f9fafb; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; color: #4b5563; font-size: 12px; font-weight: 700; text-transform: uppercase;">Ubicación</td>
+                                    <td style="background-color: #ffffff; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #111827; font-size: 14px;">${request.incident_point || 'No registrada'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f9fafb; padding: 12px 16px; border-right: 1px solid #e5e7eb; color: #4b5563; font-size: 12px; font-weight: 700; text-transform: uppercase;">Motivo</td>
+                                    <td style="background-color: #ffffff; padding: 12px 16px; color: #111827; font-size: 14px;">${request.reason || 'No registrado'}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
 
-        <!-- Detalle -->
-        <div style="background-color: #f5f5f5; padding: 15px; border: 1px solid #cccccc; margin-bottom: 20px;">
-            <p style="margin: 0 0 5px; font-weight: bold;">Detalle del Incidente:</p>
-            <p style="margin: 0; font-style: italic;">${(request.detail || 'Sin detalles.').replace(/\n/g, '<br>')}</p>
-        </div>
+                    <!-- Details Section -->
+                    <tr>
+                        <td style="padding: 0 40px 30px 40px;">
+                             <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td style="padding-bottom: 8px; color: #374151; font-size: 13px; font-weight: 700; text-transform: uppercase;">Detalle Reportado</td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; color: #475569; font-size: 14px; line-height: 1.6; font-style: italic;">
+                                        "${(request.detail || 'Sin detalles adicionales.').replace(/\n/g, '<br>')}"
+                                    </td>
+                                </tr>
+                             </table>
+                        </td>
+                    </tr>
 
-        <!-- Boton o Mensaje -->
-        ${request.video_url ?
-            `<div style="text-align: left; margin: 20px 0;">
-            <a href="${request.video_url}" style="background-color: #0056b3; color: #ffffff; padding: 10px 20px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;">Descargar Video</a>
-            <p style="font-size: 11px; margin-top: 5px; color: #666666;">Enlace directo al servidor de evidencia.</p>
-        </div>` :
-            `<div style="border: 1px solid #cc0000; background-color: #fff0f0; padding: 10px; color: #cc0000;">
-            <strong>Evidencia No Disponible</strong><br>
-            Razón: ${request.failure_type || 'Motivo no especificado'} ${request.obs ? `(${request.obs})` : ''}
-        </div>`
+                    <!-- Action Area -->
+                    <tr>
+                        <td style="padding: 0 40px 40px 40px; text-align: center;">
+                            ${request.video_url ?
+            `<!-- Download Button -->
+                            <table border="0" cellpadding="0" cellspacing="0" align="center">
+                                <tr>
+                                    <td bgcolor="#1e40af" style="border-radius: 8px;">
+                                        <a href="${request.video_url}" target="_blank" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: bold; border-radius: 8px; font-family: Helvetica, Arial, sans-serif;">
+                                            📥 Descargar Evidencia
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin: 12px 0 0 0; color: #94a3b8; font-size: 12px;">Enlace directo al servidor seguro</p>`
+            :
+            `<!-- Unavailable Warning -->
+                             <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="margin: 0 0 4px 0; color: #991b1b; font-size: 15px; font-weight: 700;">Evidencia No Disponible</p>
+                                        <p style="margin: 0; color: #b91c1c; font-size: 13px;">
+                                             ${(() => {
+                const failureLabel = request.failure_type
+                    ? (request.failure_type === 'disco_danado' ? 'Disco Dañado' :
+                        request.failure_type === 'bus_sin_disco' ? 'Bus Sin Disco' :
+                            request.failure_type === 'video_sobreescrito' ? 'Video Sobreescrito' :
+                                request.failure_type === 'error_lectura' ? 'Error de Lectura' :
+                                    request.failure_type === 'no_disponible' ? 'No Disponible' :
+                                        request.failure_type)
+                    : 'Motivo no especificado';
+                return `Causa: ${failureLabel} ${request.obs ? `<br>Observación: ${request.obs}` : ''}`;
+            })()}
+                                        </p>
+                                    </td>
+                                </tr>
+                             </table>`
         }
+                        </td>
+                    </tr>
 
-        <!-- Footer -->
-        <div style="margin-top: 30px; padding-top: 10px; border-top: 1px solid #dddddd; font-size: 11px; color: #999999;">
-            <p style="margin: 0;">Mensaje generado automáticamente por Sistema de Gestión de Videos US El Roble.</p>
-            <p style="margin: 0;">Favor no responder a este correo.</p>
-        </div>
-    </div>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8fafc; border-top: 1px solid #e5e7eb; padding: 24px 40px; text-align: center;">
+                            <p style="margin: 0 0 8px 0; color: #64748b; font-size: 12px; font-weight: 600;">US EL ROBLE</p>
+                            <p style="margin: 0; color: #94a3b8; font-size: 11px; line-height: 1.5;">
+                                Este mensaje es confidencial y generado automáticamente.<br>
+                                Favor no responder a este correo.
+                            </p>
+                            <p style="margin: 16px 0 0 0; color: #cbd5e1; font-size: 11px;">
+                                © ${new Date().getFullYear()} Sistema de Gestión de Evidencia
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+                <!-- End Main Card -->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
     `;
@@ -178,6 +282,7 @@ export const openMailClient = (request: any): boolean => {
 
     // Method 1: Create and click anchor (safest - doesn't navigate away)
     try {
+        console.log('[EMAIL] Method 1 (anchor click) triggered');
         const link = document.createElement('a');
         link.href = mailtoUrl;
         link.target = '_self';
@@ -189,7 +294,6 @@ export const openMailClient = (request: any): boolean => {
                 document.body.removeChild(link);
             }
         }, 100);
-        console.log('[EMAIL] Method 1 (anchor click) triggered');
         return true;
     } catch (e) {
         console.warn('[EMAIL] Method 1 failed:', e);
