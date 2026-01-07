@@ -80,7 +80,7 @@ export const generateEmailHtml = (request: any) => {
         
         <!-- Header Simple -->
         <div style="border-bottom: 2px solid #000066; padding-bottom: 10px; margin-bottom: 20px;">
-            <h2 style="margin: 0; color: #000066; font-size: 18px;">EXTRACCIÓN DE VIDEO - US EL ROBLE</h2>
+            <h2 style="margin: 0; color: #000066; font-size: 18px;">Solicitud de Video - US EL ROBLE</h2>
             <p style="margin: 5px 0 0; font-size: 12px; color: #666666;">Sistema de Gestión de Evidencia Digital</p>
         </div>
 
