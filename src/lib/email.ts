@@ -13,7 +13,7 @@ export const EMAIL_CONFIG = {
 };
 
 export const generateEmailSubject = (case_number: string) => {
-    return `EXTRACCION DE VIDEO - Investigación Caso ${case_number}`;
+    return `Solicitud de Video - Caso ${case_number}`;
 };
 
 export const generateEmailBody = (request: any) => {
