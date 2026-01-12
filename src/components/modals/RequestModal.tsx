@@ -4,6 +4,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import { format } from "date-fns"
 import { RequestForm } from "@/components/forms/RequestForm"
 import { RequestFormValues } from "@/lib/schemas"
 import { useState } from "react"
@@ -73,9 +74,9 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
                     <RequestForm
                         initialValues={{
                             ...request,
-                            // Conversión de fechas para inputs type="datetime-local"
-                            incident_at: request.incident_at ? new Date(request.incident_at).toISOString().slice(0, 16) : '',
-                            ingress_at: request.ingress_at ? new Date(request.ingress_at).toISOString().slice(0, 16) : '',
+                            // Convert UTC timestamps to Local Literal strings for the form
+                            incident_at: request.incident_at ? format(new Date(request.incident_at), "yyyy-MM-dd'T'HH:mm") : '',
+                            ingress_at: request.ingress_at ? format(new Date(request.ingress_at), "yyyy-MM-dd'T'HH:mm") : '',
                         }}
                         onSubmit={handleSubmit}
                         isLoading={loading}
