@@ -188,7 +188,16 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             if (incidentAtMatch) result.incident_at = parseSpanishDate(incidentAtMatch[1]);
 
             const ingressAtMatch = cleanContent.match(patterns.ingress_at);
-            if (ingressAtMatch) result.ingress_at = parseSpanishDate(ingressAtMatch[1]);
+            if (ingressAtMatch) {
+                result.ingress_at = parseSpanishDate(ingressAtMatch[1]);
+            }
+
+            // Fallback: If no ingress date found, use today's date
+            if (!result.ingress_at) {
+                const today = new Date();
+                const pad = (n: number) => n.toString().padStart(2, '0');
+                result.ingress_at = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}T00:00`;
+            }
 
             const ppuMatch = cleanContent.match(patterns.ppu);
             if (ppuMatch) result.ppu = ppuMatch[1].trim();
