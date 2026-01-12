@@ -19,6 +19,11 @@ function decodeQuotedPrintable(input: string): string {
         .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
+function stripHtml(html: string): string {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || "";
+}
+
 function parseSpanishDate(dateStr: string): string | undefined {
     if (!dateStr) return undefined;
 
@@ -130,6 +135,9 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
 
             const result: ParsedEml = {};
 
+            // Strip HTML tags for cleaner regex matching
+            const cleanContent = stripHtml(content);
+
             const patterns = {
                 // More flexible case number patterns
                 case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso|Número)\s*(?:#|N°|:|.)?\s*(\d+)/i,
@@ -144,25 +152,25 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
                 detail: /(?:Detalle|Observaciones|Descripci[oó]n)\s*[:.]\s*([\s\S]+?)(?:\n\s*\n|$)/i,
             };
 
-            const caseMatch = content.match(patterns.case_number) || content.match(patterns.case_number_alt);
+            const caseMatch = cleanContent.match(patterns.case_number) || cleanContent.match(patterns.case_number_alt);
             if (caseMatch) result.case_number = caseMatch[1];
 
-            const incidentAtMatch = content.match(patterns.incident_at);
+            const incidentAtMatch = cleanContent.match(patterns.incident_at);
             if (incidentAtMatch) result.incident_at = parseSpanishDate(incidentAtMatch[1]);
 
-            const ingressAtMatch = content.match(patterns.ingress_at);
+            const ingressAtMatch = cleanContent.match(patterns.ingress_at);
             if (ingressAtMatch) result.ingress_at = parseSpanishDate(ingressAtMatch[1]);
 
-            const ppuMatch = content.match(patterns.ppu);
+            const ppuMatch = cleanContent.match(patterns.ppu);
             if (ppuMatch) result.ppu = ppuMatch[1].trim();
 
-            const pointMatch = content.match(patterns.incident_point);
+            const pointMatch = cleanContent.match(patterns.incident_point);
             if (pointMatch) result.incident_point = pointMatch[1].trim();
 
-            const reasonMatch = content.match(patterns.reason);
+            const reasonMatch = cleanContent.match(patterns.reason);
             if (reasonMatch) result.reason = reasonMatch[1].trim();
 
-            const detailMatch = content.match(patterns.detail);
+            const detailMatch = cleanContent.match(patterns.detail);
             if (detailMatch) result.detail = detailMatch[1].trim();
 
             if (result.detail) {

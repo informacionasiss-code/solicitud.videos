@@ -127,6 +127,10 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
                         </div>
                     )}
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        {/* CSS to attempt to hide AM/PM in some browsers if supported, usually system dependent */}
+                        <style>{`
+                            input[type="datetime-local"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+                        `}</style>
 
                         <div className="space-y-2">
                             <Label htmlFor="case_number">Caso #</Label>
@@ -178,13 +182,25 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="incident_at">Fecha Incidente</Label>
-                            <Input id="incident_at" type="datetime-local" {...register("incident_at")} />
+                            <Label htmlFor="incident_at">Fecha Incidente (24h)</Label>
+                            <Input
+                                id="incident_at"
+                                type="datetime-local"
+                                {...register("incident_at")}
+                                step="60"
+                                className="block"
+                            />
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="ingress_at">Fecha Ingreso</Label>
-                            <Input id="ingress_at" type="datetime-local" {...register("ingress_at")} />
+                            <Label htmlFor="ingress_at">Fecha Ingreso (24h)</Label>
+                            <Input
+                                id="ingress_at"
+                                type="datetime-local"
+                                {...register("ingress_at")}
+                                step="60"
+                                className="block"
+                            />
                         </div>
 
                         <div className="space-y-2 md:col-span-2">

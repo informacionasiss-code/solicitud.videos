@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { format } from "date-fns";
+// import { format } from "date-fns"; // logic changed to standard ISO
 import { useDropzone } from "react-dropzone";
 import { UploadCloud, FileText, Sparkles, CheckCircle } from "lucide-react";
 import { RequestForm } from "@/components/forms/RequestForm";
@@ -45,8 +45,8 @@ export default function Ingresos() {
             const { error } = await supabase.from('solicitudes').insert([
                 {
                     case_number: values.case_number,
-                    incident_at: values.incident_at ? format(new Date(values.incident_at), "yyyy-MM-dd'T'HH:mm:ss") : null,
-                    ingress_at: values.ingress_at ? format(new Date(values.ingress_at), "yyyy-MM-dd'T'HH:mm:ss") : null,
+                    incident_at: values.incident_at ? new Date(values.incident_at).toISOString() : null,
+                    ingress_at: values.ingress_at ? new Date(values.ingress_at).toISOString() : null,
                     ppu: values.ppu,
                     incident_point: values.incident_point,
                     reason: values.reason,

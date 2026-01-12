@@ -172,7 +172,7 @@ export default function Registros() {
                 const date = row.getValue("incident_at");
                 return date ? (
                     <span className="text-sm text-slate-600 dark:text-slate-400">
-                        {format(new Date(date as string), "dd MMM yyyy, HH:mm", { locale: es })}
+                        {format(new Date(date as string), "dd/MM/yyyy HH:mm", { locale: es })}
                     </span>
                 ) : <span className="text-slate-400">—</span>;
             },
