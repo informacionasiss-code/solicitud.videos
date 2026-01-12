@@ -59,63 +59,7 @@ function parseSpanishDate(dateStr: string): string | undefined {
 
 // Parse operator info from email content
 // Format: "DATOS OB:" on one line, then "NAME RUT" on next line
-function parseOperator(content: string): { name?: string; rut?: string } {
-    // Pattern for multiline: DATOS OB: followed by newline(s) then NAME RUT
-    // Example: 
-    // DATOS OB:
-    // VIVANCO ZUÑIGA, VALESKA CORINA 15418817-7
-    const multilinePattern = /DATOS\s*OB[:\s]*[\r\n]+\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i;
 
-    let match = content.match(multilinePattern);
-    if (match) {
-        const name = match[1]?.trim()
-            .replace(/,\s*$/, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-        const rut = match[2]?.trim().toUpperCase();
-        if (name && name.length > 2) {
-            return { name, rut };
-        }
-    }
-
-    // Fallback: same line format
-    const sameLinePatterns = [
-        /DATOS\s*OB[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
-        /DATOS\s*OB[:\s]*([^0-9\n]+?)(\d{7,8}-[\dkK])/i,
-    ];
-
-    for (const pattern of sameLinePatterns) {
-        match = content.match(pattern);
-        if (match) {
-            const name = match[1]?.trim()
-                .replace(/,\s*$/, '')
-                .replace(/\s+/g, ' ')
-                .trim();
-            const rut = match[2]?.trim().toUpperCase();
-            if (name && name.length > 2) {
-                return { name, rut };
-            }
-        }
-    }
-
-    // Last fallback: Conductor/Chofer patterns
-    const fallbackPatterns = [
-        /Conductor[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
-        /Chofer[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i,
-    ];
-
-    for (const pattern of fallbackPatterns) {
-        match = content.match(pattern);
-        if (match) {
-            return {
-                name: match[1]?.trim().replace(/,\s*$/, ''),
-                rut: match[2]?.trim().toUpperCase()
-            };
-        }
-    }
-
-    return {};
-}
 
 export async function parseEmlFile(file: File): Promise<ParsedEml> {
     return new Promise((resolve, reject) => {
@@ -135,9 +79,9 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             // Enhanced HTML stripping
             const stripHtml = (html: string) => {
                 let text = html || "";
-                // Replace standard breaks and block elements with spaces to prevent merging words
+                // Replace standard breaks and block elements with spaces
                 text = text.replace(/<br\s*\/?>/gi, " ");
-                text = text.replace(/<\/(p|div|tr|h\d)>/gi, " ");
+                text = text.replace(/<\/(p|div|tr|td|th|li|h\d|ul|ol|table|blockquote)>/gi, " ");
                 // Remove all other tags
                 text = text.replace(/<[^>]*>/g, "");
                 // Decode common entities
@@ -152,14 +96,14 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             const cleanContent = stripHtml(content);
 
             const patterns = {
-                // Case number: matches "#06652363" or "número #06652363"
+                // Case number
                 case_number: /#\s*(\d{6,})/i,
 
-                // Dates - simpler patterns that capture until end of line
+                // Dates
                 ingress_at: /Fecha\s*de\s*ingreso\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:\s+\d{1,2}:\d{2})?)/i,
                 incident_at: /Fecha\s*(?:del?)?\s*incidente\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:\s+\d{1,2}:\d{2})?)/i,
 
-                // PPU: matches "PPU: PFTW38" or "PPU: ABCD12" (letters + digits)
+                // PPU
                 ppu: /PPU\s*:\s*([A-Z0-9]{4,8})/i,
 
                 // Location
@@ -168,7 +112,7 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
                 // Reason
                 reason: /Motivo\s*del\s*descargo\s*:\s*(.+?)(?=\s*(?:Submotivo|Detalle|DATOS|$))/i,
 
-                // Detail - captures multiline text
+                // Detail - stops at DATOS OB or End of String
                 detail: /Detalle\s*:\s*([\s\S]+?)(?=\s*(?:DATOS\s*OB|$))/i,
             };
 
@@ -211,14 +155,23 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             const detailMatch = cleanContent.match(patterns.detail);
             if (detailMatch) result.detail = detailMatch[1].trim();
 
-            if (result.detail) {
-                result.detail = result.detail.replace(/<[^>]*>/g, '').trim();
-            }
-
             // Extract operator info
-            const operator = parseOperator(content);
-            if (operator.name) result.operator_name = operator.name;
-            if (operator.rut) result.operator_rut = operator.rut;
+            // Parses "DATOS OB: NAME RUT" from clean content
+            const operatorPattern = /DATOS\s*OB\s*[:\s]*([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i;
+            const operatorMatch = cleanContent.match(operatorPattern);
+
+            if (operatorMatch) {
+                result.operator_name = operatorMatch[1].trim().replace(/,\s*$/, '');
+                result.operator_rut = operatorMatch[2].trim().toUpperCase();
+            } else {
+                // Fallback for "Chofer: ..."
+                const altOpPattern = /(?:Conductor|Chofer)\s*[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i;
+                const altMatch = cleanContent.match(altOpPattern);
+                if (altMatch) {
+                    result.operator_name = altMatch[1].trim().replace(/,\s*$/, '');
+                    result.operator_rut = altMatch[2].trim().toUpperCase();
+                }
+            }
 
             resolve(result);
         };
