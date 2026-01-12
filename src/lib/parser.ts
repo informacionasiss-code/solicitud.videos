@@ -19,10 +19,7 @@ function decodeQuotedPrintable(input: string): string {
         .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
-function stripHtml(html: string): string {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    return doc.body.textContent || "";
-}
+
 
 function parseSpanishDate(dateStr: string): string | undefined {
     if (!dateStr) return undefined;
@@ -135,25 +132,57 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
 
             const result: ParsedEml = {};
 
-            // Strip HTML tags for cleaner regex matching
+            // Enhanced HTML stripping
+            const stripHtml = (html: string) => {
+                let text = html || "";
+                // Replace standard breaks and block elements with spaces to prevent merging words
+                text = text.replace(/<br\s*\/?>/gi, " ");
+                text = text.replace(/<\/(p|div|tr|h\d)>/gi, " ");
+                // Remove all other tags
+                text = text.replace(/<[^>]*>/g, "");
+                // Decode common entities
+                text = text.replace(/&nbsp;/g, " ");
+                text = text.replace(/&lt;/g, "<");
+                text = text.replace(/&gt;/g, ">");
+                text = text.replace(/&amp;/g, "&");
+                // Normalize whitespace
+                return text.replace(/\s+/g, " ").trim();
+            };
+
             const cleanContent = stripHtml(content);
 
             const patterns = {
-                // More flexible case number patterns
-                case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso|Número)\s*(?:#|N°|:|.)?\s*(\d+)/i,
-                case_number_alt: /#\s*(\d+)/,
+                // Regex updated to be extremely greedy with digits and handle spacing around '#'
+                // Matches "Case number # 12345", "Solicitud 12345", "Caso #12345", "número #06653857"
+                case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso|N[uú]mero)\s*(?:#|N°|:|.)?\s*(\d+)/i,
+                case_number_alt: /#\s*(\d{5,})/, // Backup: looks for hash followed by at least 5 digits
 
-                // More flexible headers with optional colons
-                incident_at: /(?:Fecha\s*(?:del?)?\s*incidente|Fecha\s*de\s*Ocurrencia)\s*[:.]?\s*(.+)/i,
-                ingress_at: /(?:Fecha\s*de\s*ingreso|Fecha\s*Ingreso|Ingreso)\s*[:.]?\s*(.+)/i,
-                ppu: /(?:PPU|Patente|Placa)\s*[:.]?\s*([A-Z]{4}[-.]?\d{2}|[A-Z]{2}[-.]?\d{4}|[A-Z]{2}[-.]?\d{2}[-.]?\d{2})/i, // More specific PPU patterns (ABCD12, AB1234, AB-12-34)
-                incident_point: /(?:Punto del incidente|Lugar|Ubicaci[oó]n|Direcci[oó]n)\s*[:.]?\s*(.+)/i,
-                reason: /(?:Motivo del descargo|Motivo|Causa)\s*[:.]?\s*(.+)/i,
+                // Dates
+                incident_at: /(?:Fecha\s*(?:del?)?\s*incidente|Fecha\s*de\s*Ocurrencia)\s*[:.]?\s*(.+?)(?=\s*(?:Fecha|PPU|Patente|Punto|Motivo|$))/i,
+                ingress_at: /(?:Fecha\s*de\s*ingreso|Fecha\s*Ingreso|Ingreso)\s*[:.]?\s*(.+?)(?=\s*(?:Fecha|PPU|Patente|Punto|Motivo|$))/i,
+
+                // Other fields
+                ppu: /(?:PPU|Patente|Placa)\s*[:.]?\s*([A-Z]{2,4}[-.]?\d{2,4}[-.]?\d{0,2})/i,
+                incident_point: /(?:Punto del incidente|Lugar|Ubicaci[oó]n|Direcci[oó]n)\s*[:.]?\s*(.+?)(?=\s*(?:Fecha|PPU|Patente|Motivo|$))/i,
+                reason: /(?:Motivo del descargo|Motivo|Causa)\s*[:.]?\s*(.+?)(?=\s*(?:Detalle|Observaciones|Descripci[oó]n|$))/i,
                 detail: /(?:Detalle|Observaciones|Descripci[oó]n)\s*[:.]\s*([\s\S]+?)(?:\n\s*\n|$)/i,
             };
 
-            const caseMatch = cleanContent.match(patterns.case_number) || cleanContent.match(patterns.case_number_alt);
-            if (caseMatch) result.case_number = caseMatch[1];
+            // Heuristic: If we find multiple matches, prefer the longer one for case number
+            let caseNumKeywords = cleanContent.match(patterns.case_number);
+            let caseNumHash = cleanContent.match(patterns.case_number_alt);
+
+            let bestCaseMatch = null;
+            if (caseNumKeywords && caseNumKeywords[1]) bestCaseMatch = caseNumKeywords[1];
+
+            // If the "Hash" match is longer (and likely more accurate if the keyword regex cut short), use it.
+            if (caseNumHash && caseNumHash[1]) {
+                if (!bestCaseMatch || caseNumHash[1].length > bestCaseMatch.length) {
+                    bestCaseMatch = caseNumHash[1];
+                }
+            }
+
+            if (bestCaseMatch) result.case_number = bestCaseMatch;
 
             const incidentAtMatch = cleanContent.match(patterns.incident_at);
             if (incidentAtMatch) result.incident_at = parseSpanishDate(incidentAtMatch[1]);
