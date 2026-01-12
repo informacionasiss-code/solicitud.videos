@@ -96,8 +96,9 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             const cleanContent = stripHtml(content);
 
             const patterns = {
-                // Case number
-                case_number: /#\s*(\d{6,})/i,
+                // Case number: matches "Caso #12345", "Solicitud 123456", "#06652363"
+                case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso|N[uú]mero|recibido\s+con\s+el\s+n[uú]mero)\s*(?:#|N°|:|.)?\s*(\d+)/i,
+                case_number_fallback: /#\s*(\d{6,})/, // Fallback for just hash + digits
 
                 // Dates
                 ingress_at: /Fecha\s*de\s*ingreso\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:\s+\d{1,2}:\d{2})?)/i,
@@ -118,7 +119,14 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
 
             // Case Number
             const caseMatch = cleanContent.match(patterns.case_number);
-            if (caseMatch) result.case_number = caseMatch[1];
+            if (caseMatch && caseMatch[1]) {
+                result.case_number = caseMatch[1];
+            } else {
+                const caseFallback = cleanContent.match(patterns.case_number_fallback);
+                if (caseFallback && caseFallback[1]) {
+                    result.case_number = caseFallback[1];
+                }
+            }
 
             // Fecha Incidente
             const incidentAtMatch = cleanContent.match(patterns.incident_at);
