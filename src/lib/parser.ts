@@ -70,7 +70,7 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             const decoder = new TextDecoder("iso-8859-1");
             let content = decoder.decode(arrayBuffer);
 
-            if (content.match(/=[0-9A-F]{2}/i)) {
+            if (content.match(/=[0-9A-F]{2}/i) || content.match(/=\r?\n/)) {
                 content = decodeQuotedPrintable(content);
             }
 
