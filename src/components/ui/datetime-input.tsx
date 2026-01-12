@@ -1,53 +1,85 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface DateTimeInputProps {
-    value?: string; // Expects ISO-like string YYYY-MM-DDTHH:mm or similar
+    value?: string;
     onChange: (value: string) => void;
     id?: string;
-    className?: string; // Add className prop to satisfy basic component usage
+    className?: string;
+    includeTime?: boolean; // New prop to control time input
 }
 
-/**
- * A component that splits DateTime input into two controlled fields: Date and Time.
- * Forces the browser to strictly respect 24h format by using type="time".
- */
-export function DateTimeInput({ value, onChange, id }: DateTimeInputProps) {
-    // Value is expected to be "YYYY-MM-DDTHH:mm" (local literal)
-    // If it comes as a full ISO with Z, we might need to be careful, but the parent form usually holds the local literal for editing.
-
-    // Safety check parsing
+export function DateTimeInput({ value, onChange, id, className, includeTime = true }: DateTimeInputProps) {
+    // Parse initial values
     const datePart = value ? value.split('T')[0] : "";
     const timePart = value && value.includes('T') ? value.split('T')[1].substring(0, 5) : "";
+
+    // Local state for time input to allow typing without jitter
+    const [timeInput, setTimeInput] = useState(timePart);
+
+    useEffect(() => {
+        setTimeInput(timePart);
+    }, [timePart]);
 
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newDate = e.target.value;
         if (!newDate) {
-            // If date is cleared, we effectively clear the whole thing? 
-            // Or keep time? Let's keep time if exists, but usually date is required.
-            // If we return just "T12:00", it's invalid.
-            // If date is empty, value is empty.
             onChange("");
             return;
         }
-        const currentTime = timePart || "00:00";
+
+        if (!includeTime) {
+            onChange(`${newDate}T00:00:00`); // Normalize to midnight if time invalid/hidden
+            return;
+        }
+
+        // Keep existing time or default to 00:00
+        const currentTime = timeInput || "00:00";
         onChange(`${newDate}T${currentTime}`);
     };
 
     const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newTime = e.target.value;
-        const currentDate = datePart;
+        let input = e.target.value;
 
-        if (!currentDate) {
-            // Cannot set time without date effectively
-            return;
+        // Basic filtering: only numbers and colon
+        if (!/^[0-9:]*$/.test(input)) return;
+
+        // Auto-insert colon
+        if (input.length === 2 && timeInput.length === 1 && !input.includes(':')) {
+            input += ':';
         }
-        onChange(`${currentDate}T${newTime}`);
+
+        setTimeInput(input);
+
+        // Update parent only if valid HH:mm
+        if (input.length === 5 && input.includes(':')) {
+            const [hh, mm] = input.split(':').map(Number);
+            if (!isNaN(hh) && !isNaN(mm) && hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) {
+                const currentDate = datePart;
+                if (currentDate) {
+                    onChange(`${currentDate}T${input}`);
+                }
+            }
+        }
     };
 
+    const handleTimeBlur = () => {
+        // Validation on blur
+        if (timeInput.length === 5) {
+            const [hh, mm] = timeInput.split(':').map(Number);
+            if (!(hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59)) {
+                setTimeInput(""); // Clear invalid
+            }
+        } else {
+            // Incomplete
+            setTimeInput("");
+        }
+    }
+
     return (
-        <div className="flex gap-2 w-full" id={id}>
-            <div className="flex-1">
+        <div className={cn("flex gap-2 w-full", className)} id={id}>
+            <div className={`flex-1 ${!includeTime ? 'w-full' : ''}`}>
                 <Input
                     type="date"
                     value={datePart}
@@ -55,15 +87,19 @@ export function DateTimeInput({ value, onChange, id }: DateTimeInputProps) {
                     className="block w-full"
                 />
             </div>
-            <div className="w-32">
-                <Input
-                    type="time"
-                    value={timePart}
-                    onChange={handleTimeChange}
-                    className="block w-full"
-                // step="60" // Optional: force seconds or not. Default is usually minutes.
-                />
-            </div>
+            {includeTime && (
+                <div className="w-24 shrink-0">
+                    <Input
+                        type="text"
+                        value={timeInput}
+                        onChange={handleTimeChange}
+                        onBlur={handleTimeBlur}
+                        className="block w-full text-center"
+                        placeholder="HH:mm"
+                        maxLength={5}
+                    />
+                </div>
+            )}
         </div>
     );
 }

@@ -184,13 +184,14 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="incident_at">Fecha Incidente (24h)</Label>
+                            <Label htmlFor="incident_at">Fecha Incidente (DD/MM/AAAA + HH:mm)</Label>
                             <Controller
                                 control={control}
                                 name="incident_at"
                                 render={({ field }) => (
                                     <DateTimeInput
                                         {...field}
+                                        includeTime={true}
                                         value={field.value as string}
                                         onChange={field.onChange}
                                     />
@@ -199,13 +200,14 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="ingress_at">Fecha Ingreso (24h)</Label>
+                            <Label htmlFor="ingress_at">Fecha Ingreso (Solo Fecha)</Label>
                             <Controller
                                 control={control}
                                 name="ingress_at"
                                 render={({ field }) => (
                                     <DateTimeInput
                                         {...field}
+                                        includeTime={false}
                                         value={field.value as string}
                                         onChange={field.onChange}
                                     />
