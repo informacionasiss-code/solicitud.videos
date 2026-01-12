@@ -89,6 +89,10 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
                 text = text.replace(/&lt;/g, "<");
                 text = text.replace(/&gt;/g, ">");
                 text = text.replace(/&amp;/g, "&");
+
+                // Remove invisible characters (Zero-width space, etc) preventing regex matches
+                text = text.replace(/[\u200B-\u200D\uFEFF]/g, "");
+
                 // Normalize whitespace
                 return text.replace(/\s+/g, " ").trim();
             };
