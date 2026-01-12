@@ -97,8 +97,9 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
 
             const patterns = {
                 // Case number: matches "Caso #12345", "Solicitud 123456", "#06652363"
-                case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso|N[uú]mero|recibido\s+con\s+el\s+n[uú]mero)\s*(?:#|N°|:|.)?\s*(\d+)/i,
-                case_number_fallback: /#\s*(\d{6,})/, // Fallback for just hash + digits
+                // Allow spaces within decimals to handle formatting like "0665 2340" or "066523 40"
+                case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso|N[uú]mero|recibido\s+con\s+el\s+n[uú]mero)\s*(?:#|N°|:|.)?\s*([\d\s]{6,})/i,
+                case_number_fallback: /#\s*([\d\s]{6,})/, // Fallback for just hash + digits
 
                 // Dates
                 ingress_at: /Fecha\s*de\s*ingreso\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:\s+\d{1,2}:\d{2})?)/i,
@@ -120,11 +121,12 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             // Case Number
             const caseMatch = cleanContent.match(patterns.case_number);
             if (caseMatch && caseMatch[1]) {
-                result.case_number = caseMatch[1];
+                // Remove any spaces captured inside the number
+                result.case_number = caseMatch[1].replace(/\s+/g, '');
             } else {
                 const caseFallback = cleanContent.match(patterns.case_number_fallback);
                 if (caseFallback && caseFallback[1]) {
-                    result.case_number = caseFallback[1];
+                    result.case_number = caseFallback[1].replace(/\s+/g, '');
                 }
             }
 
