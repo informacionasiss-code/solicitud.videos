@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useState, useEffect, useCallback } from "react";
+import { DateTimeInput } from "@/components/ui/datetime-input";
+import { Controller } from "react-hook-form";
 
 interface RequestFormProps {
     initialValues?: Partial<RequestFormValues>;
@@ -183,23 +185,31 @@ export function RequestForm({ initialValues, onSubmit, isLoading, title = "Formu
 
                         <div className="space-y-2">
                             <Label htmlFor="incident_at">Fecha Incidente (24h)</Label>
-                            <Input
-                                id="incident_at"
-                                type="datetime-local"
-                                {...register("incident_at")}
-                                step="60"
-                                className="block"
+                            <Controller
+                                control={control}
+                                name="incident_at"
+                                render={({ field }) => (
+                                    <DateTimeInput
+                                        {...field}
+                                        value={field.value as string}
+                                        onChange={field.onChange}
+                                    />
+                                )}
                             />
                         </div>
 
                         <div className="space-y-2">
                             <Label htmlFor="ingress_at">Fecha Ingreso (24h)</Label>
-                            <Input
-                                id="ingress_at"
-                                type="datetime-local"
-                                {...register("ingress_at")}
-                                step="60"
-                                className="block"
+                            <Controller
+                                control={control}
+                                name="ingress_at"
+                                render={({ field }) => (
+                                    <DateTimeInput
+                                        {...field}
+                                        value={field.value as string}
+                                        onChange={field.onChange}
+                                    />
+                                )}
                             />
                         </div>
 
