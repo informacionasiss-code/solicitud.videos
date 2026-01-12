@@ -132,15 +132,15 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
 
             const patterns = {
                 // More flexible case number patterns
-                case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso)\s*(?:#|N°|:)?\s*(\d+)/i,
-                case_number_alt: /#\s*(\d{6,})/,
+                case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso|Número)\s*(?:#|N°|:|.)?\s*(\d+)/i,
+                case_number_alt: /#\s*(\d+)/,
 
                 // More flexible headers with optional colons
                 incident_at: /(?:Fecha\s*(?:del?)?\s*incidente|Fecha\s*de\s*Ocurrencia)\s*[:.]?\s*(.+)/i,
                 ingress_at: /(?:Fecha\s*de\s*ingreso|Fecha\s*Ingreso|Ingreso)\s*[:.]?\s*(.+)/i,
-                ppu: /(?:PPU|Patente)\s*[:.]?\s*([A-Z0-9\-]+)/i,
-                incident_point: /(?:Punto del incidente|Lugar|Ubicaci[oó]n)\s*[:.]?\s*(.+)/i,
-                reason: /(?:Motivo del descargo|Motivo)\s*[:.]?\s*(.+)/i,
+                ppu: /(?:PPU|Patente|Placa)\s*[:.]?\s*([A-Z]{4}[-.]?\d{2}|[A-Z]{2}[-.]?\d{4}|[A-Z]{2}[-.]?\d{2}[-.]?\d{2})/i, // More specific PPU patterns (ABCD12, AB1234, AB-12-34)
+                incident_point: /(?:Punto del incidente|Lugar|Ubicaci[oó]n|Direcci[oó]n)\s*[:.]?\s*(.+)/i,
+                reason: /(?:Motivo del descargo|Motivo|Causa)\s*[:.]?\s*(.+)/i,
                 detail: /(?:Detalle|Observaciones|Descripci[oó]n)\s*[:.]\s*([\s\S]+?)(?:\n\s*\n|$)/i,
             };
 
