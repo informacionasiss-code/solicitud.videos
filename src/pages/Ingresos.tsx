@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 // import { format } from "date-fns"; // logic changed to standard ISO
 import { useDropzone } from "react-dropzone";
-import { UploadCloud, FileText, CheckCircle } from "lucide-react";
+import { UploadCloud, FileText, Sparkles, CheckCircle } from "lucide-react";
 import { RequestForm } from "@/components/forms/RequestForm";
 import { parseEmlFile } from "@/lib/parser";
 import { RequestFormValues } from "@/lib/schemas";
@@ -72,78 +72,99 @@ export default function Ingresos() {
     };
 
     return (
-        <div className="h-[calc(100vh-4rem)] w-full overflow-hidden bg-slate-50/50 p-4">
-            <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-12">
-                {/* Left Panel: Upload & Info */}
-                <div className="flex h-full flex-col gap-4 lg:col-span-4 xl:col-span-3">
-                    {/* Drag & Drop Zone */}
+        <div className="space-y-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
+                {/* Left Column - Drop Zone */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Drop Zone Card */}
                     <div
                         {...getRootProps()}
-                        className={`group relative flex flex-1 flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all duration-300 cursor-pointer
-                        ${isDragActive
-                                ? "border-blue-500 bg-blue-50/50 scale-[0.99]"
-                                : fileUploaded
-                                    ? "border-emerald-500 bg-emerald-50/50"
-                                    : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"
-                            }
-                        `}
+                        className={`drop-zone relative p-8 flex flex-col items-center justify-center cursor-pointer min-h-[280px] ${isDragActive ? 'active border-blue-500 bg-blue-50' : ''
+                            } ${fileUploaded ? 'border-emerald-500 bg-emerald-50' : ''}`}
                     >
                         <input {...getInputProps()} />
-                        <div className="z-10 flex flex-col items-center gap-4 text-center p-6">
-                            <div className={`rounded-2xl p-4 transition-transform duration-300 group-hover:scale-110 shadow-sm
-                                ${fileUploaded ? "bg-emerald-100 text-emerald-600" : "bg-white text-slate-400"}
-                            `}>
-                                {fileUploaded ? (
-                                    <CheckCircle className="h-10 w-10" />
-                                ) : (
-                                    <UploadCloud className="h-10 w-10" />
-                                )}
-                            </div>
-                            <div className="space-y-1">
-                                <h3 className="text-lg font-semibold text-slate-800">
-                                    {fileUploaded ? "¡Archivo Procesado!" : "Nuevo Ingreso"}
-                                </h3>
-                                <p className="text-sm text-slate-500 max-w-[200px] leading-relaxed">
-                                    {fileUploaded
-                                        ? "La información ha sido extraída. Verifica los datos a la derecha."
-                                        : "Arrastra tu archivo .eml aquí o haz clic para buscar"}
+
+                        {fileUploaded ? (
+                            <>
+                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-4 shadow-lg">
+                                    <CheckCircle className="h-8 w-8 text-white" />
+                                </div>
+                                <p className="text-lg font-semibold text-emerald-700">¡Archivo Cargado!</p>
+                                <p className="text-sm text-emerald-600 mt-1">Los datos han sido extraídos</p>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setFileUploaded(false); setParsedData(null); }}
+                                    className="mt-4 text-xs text-slate-500 hover:text-slate-700 underline"
+                                >
+                                    Cargar otro archivo
+                                </button>
+                            </>
+                        ) : loading ? (
+                            <>
+                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg animate-pulse">
+                                    <Sparkles className="h-8 w-8 text-white animate-spin" />
+                                </div>
+                                <p className="text-lg font-semibold text-slate-700">Procesando...</p>
+                                <p className="text-sm text-slate-500 mt-1">Extrayendo datos del correo</p>
+                            </>
+                        ) : (
+                            <>
+                                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-lg transition-all ${isDragActive
+                                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600 scale-110'
+                                    : 'bg-gradient-to-br from-slate-500 to-slate-600'
+                                    }`}>
+                                    <UploadCloud className="h-8 w-8 text-white" />
+                                </div>
+                                <p className="text-lg font-semibold text-slate-700">
+                                    {isDragActive ? "Suelta aquí" : "Arrastra un .eml"}
                                 </p>
-                            </div>
-                        </div>
+                                <p className="text-sm text-slate-500 mt-1 text-center">
+                                    o haz click para seleccionar
+                                </p>
+                                <div className="mt-6 px-4 py-2 bg-slate-100 rounded-full text-xs text-slate-500">
+                                    Solo archivos .eml
+                                </div>
+                            </>
+                        )}
                     </div>
 
-                    {/* Helper Card */}
-                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div className="mb-3 flex items-center gap-2">
-                            <div className="rounded-lg bg-blue-100 p-1.5 text-blue-600">
-                                <FileText className="h-4 w-4" />
-                            </div>
-                            <span className="font-semibold text-slate-700 text-sm">Datos Reconocidos</span>
-                        </div>
-                        <div className="space-y-3">
+                    {/* Instructions Card */}
+                    <div className="card-premium p-6">
+                        <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-blue-600" />
+                            Formato Esperado
+                        </h4>
+                        <p className="text-sm text-slate-600 mb-3">
+                            El archivo .eml debe contener las siguientes etiquetas:
+                        </p>
+                        <div className="space-y-2">
                             {[
-                                { label: "N° Caso", desc: "Formato: #1234..." },
-                                { label: "Fechas", desc: "Incidente e Ingreso" },
-                                { label: "PPU", desc: "Patente del Bus" },
-                                { label: "Detalles", desc: "Ubicación y Motivo" },
+                                { label: "Case number #", desc: "Número de caso" },
+                                { label: "Fecha del incidente:", desc: "dd/mm/yyyy" },
+                                { label: "Fecha de ingreso:", desc: "dd/mm/yyyy" },
+                                { label: "PPU:", desc: "Patente del vehículo" },
+                                { label: "Punto del incidente:", desc: "Ubicación" },
                             ].map((item, i) => (
-                                <div key={i} className="flex items-center justify-between text-xs">
-                                    <span className="font-medium text-slate-600">{item.label}</span>
-                                    <span className="text-slate-400">{item.desc}</span>
+                                <div key={i} className="flex items-center text-xs">
+                                    <code className="px-2 py-1 bg-slate-100 rounded text-slate-700 font-mono">{item.label}</code>
+                                    <span className="ml-2 text-slate-500">{item.desc}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
 
-                {/* Right Panel: High Density Form */}
-                <div className="relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-8 xl:col-span-9">
-                    <div className="flex-1 overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
+                {/* Right Column - Form */}
+                <div className="lg:col-span-3">
+                    <div className="card-premium p-6">
+                        <div className="mb-6">
+                            <h3 className="text-lg font-semibold text-slate-900">Datos de la Solicitud</h3>
+                            <p className="text-sm text-slate-500">Completa los campos requeridos</p>
+                        </div>
                         <RequestForm
                             initialValues={parsedData || {}}
                             onSubmit={handleSubmit}
                             isLoading={loading}
-                            title="Detalles de la Solicitud"
+                            key={parsedData ? 'loaded' : 'new'}
                         />
                     </div>
                 </div>
