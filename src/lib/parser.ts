@@ -152,41 +152,37 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             const cleanContent = stripHtml(content);
 
             const patterns = {
-                // Regex updated to be extremely greedy with digits and handle spacing around '#'
-                // Matches "Case number # 12345", "Solicitud 12345", "Caso #12345", "número #06653857"
-                case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso|N[uú]mero)\s*(?:#|N°|:|.)?\s*(\d+)/i,
-                case_number_alt: /#\s*(\d{5,})/, // Backup: looks for hash followed by at least 5 digits
+                // Case number: matches "#06652363" or "número #06652363"
+                case_number: /#\s*(\d{6,})/i,
 
-                // Dates
-                incident_at: /(?:Fecha\s*(?:del?)?\s*incidente|Fecha\s*de\s*Ocurrencia)\s*[:.]?\s*(.+?)(?=\s*(?:Fecha|PPU|Patente|Punto|Motivo|$))/i,
-                ingress_at: /(?:Fecha\s*de\s*ingreso|Fecha\s*Ingreso|Ingreso)\s*[:.]?\s*(.+?)(?=\s*(?:Fecha|PPU|Patente|Punto|Motivo|$))/i,
+                // Dates - simpler patterns that capture until end of line
+                ingress_at: /Fecha\s*de\s*ingreso\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:\s+\d{1,2}:\d{2})?)/i,
+                incident_at: /Fecha\s*(?:del?)?\s*incidente\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:\s+\d{1,2}:\d{2})?)/i,
 
-                // Other fields
-                ppu: /(?:PPU|Patente|Placa)\s*[:.]?\s*([A-Z]{2,4}[-.]?\d{2,4}[-.]?\d{0,2})/i,
-                incident_point: /(?:Punto del incidente|Lugar|Ubicaci[oó]n|Direcci[oó]n)\s*[:.]?\s*(.+?)(?=\s*(?:Fecha|PPU|Patente|Motivo|$))/i,
-                reason: /(?:Motivo del descargo|Motivo|Causa)\s*[:.]?\s*(.+?)(?=\s*(?:Detalle|Observaciones|Descripci[oó]n|$))/i,
-                detail: /(?:Detalle|Observaciones|Descripci[oó]n)\s*[:.]\s*([\s\S]+?)(?:\n\s*\n|$)/i,
+                // PPU: matches "PPU: PFTW38" or "PPU: ABCD12" (letters + digits)
+                ppu: /PPU\s*:\s*([A-Z0-9]{4,8})/i,
+
+                // Location
+                incident_point: /Punto\s*del\s*incidente\s*:\s*(.+?)(?=\s*(?:Motivo|Submotivo|Detalle|$))/i,
+
+                // Reason
+                reason: /Motivo\s*del\s*descargo\s*:\s*(.+?)(?=\s*(?:Submotivo|Detalle|DATOS|$))/i,
+
+                // Detail - captures multiline text
+                detail: /Detalle\s*:\s*([\s\S]+?)(?=\s*(?:DATOS\s*OB|$))/i,
             };
 
-            // Heuristic: If we find multiple matches, prefer the longer one for case number
-            let caseNumKeywords = cleanContent.match(patterns.case_number);
-            let caseNumHash = cleanContent.match(patterns.case_number_alt);
+            // Case Number
+            const caseMatch = cleanContent.match(patterns.case_number);
+            if (caseMatch) result.case_number = caseMatch[1];
 
-            let bestCaseMatch = null;
-            if (caseNumKeywords && caseNumKeywords[1]) bestCaseMatch = caseNumKeywords[1];
-
-            // If the "Hash" match is longer (and likely more accurate if the keyword regex cut short), use it.
-            if (caseNumHash && caseNumHash[1]) {
-                if (!bestCaseMatch || caseNumHash[1].length > bestCaseMatch.length) {
-                    bestCaseMatch = caseNumHash[1];
-                }
+            // Fecha Incidente
+            const incidentAtMatch = cleanContent.match(patterns.incident_at);
+            if (incidentAtMatch) {
+                result.incident_at = parseSpanishDate(incidentAtMatch[1]);
             }
 
-            if (bestCaseMatch) result.case_number = bestCaseMatch;
-
-            const incidentAtMatch = cleanContent.match(patterns.incident_at);
-            if (incidentAtMatch) result.incident_at = parseSpanishDate(incidentAtMatch[1]);
-
+            // Fecha Ingreso
             const ingressAtMatch = cleanContent.match(patterns.ingress_at);
             if (ingressAtMatch) {
                 result.ingress_at = parseSpanishDate(ingressAtMatch[1]);
@@ -199,15 +195,19 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
                 result.ingress_at = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}T00:00`;
             }
 
+            // PPU
             const ppuMatch = cleanContent.match(patterns.ppu);
-            if (ppuMatch) result.ppu = ppuMatch[1].trim();
+            if (ppuMatch) result.ppu = ppuMatch[1].trim().toUpperCase();
 
+            // Location
             const pointMatch = cleanContent.match(patterns.incident_point);
             if (pointMatch) result.incident_point = pointMatch[1].trim();
 
+            // Reason
             const reasonMatch = cleanContent.match(patterns.reason);
             if (reasonMatch) result.reason = reasonMatch[1].trim();
 
+            // Detail
             const detailMatch = cleanContent.match(patterns.detail);
             if (detailMatch) result.detail = detailMatch[1].trim();
 
