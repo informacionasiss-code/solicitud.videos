@@ -1,14 +1,8 @@
 export const EMAIL_CONFIG = {
-    to: ["sebastian.nunez@transdev.cl", "cristian.luraschi@transdev.cl"],
+    to: ["cristian.luraschi@transdev.cl"],
     cc: [
-        "christ.faus@transdev.cl",
-        "operacioner@transdev.cl",
-        "atencionusuarios@groups.transdev.com",
-        "daniela.perez@transdev.cl",
         "isaac.avila@transdev.cl",
-        "leonardo.victoriano@transdev.cl",
-        "mario.millanao@transdev.cl",
-        "cristian.luraschi@transdev.cl"
+        "mario.millanao@transdev.cl"
     ]
 };
 
