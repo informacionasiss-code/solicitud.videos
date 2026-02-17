@@ -100,38 +100,46 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             const cleanContent = stripHtml(content);
 
             const patterns = {
-                // Case number: matches "Caso #12345", "Solicitud 123456", "#06652363"
-                // Allow spaces within decimals to handle formatting like "0665 2340" or "066523 40"
-                // Relaxed to assume at least 3 digits to support smaller IDs
+                // New case format like "608608-20260217-SU3025"
+                case_number_strict: /\b\d{4,}-\d{8}-[A-Z]{2}\d{3,6}\b/i,
+
+                // Case number: matches "Caso #12345", "Solicitud 123456",
+                // or new format like "608608-20260217-SU3025"
+                // Allow spaces inside to tolerate line wraps
                 case_number: /(?:Case\s*number|Caso|Solicitud|N°\s*Caso|N[uú]mero|recibido\s+con\s+el\s+n[uú]mero)\s*(?:#|N°|:|.)?\s*([\d\s]{3,})/i,
-                case_number_fallback: /#\s*([\d\s]{3,})/, // Fallback for just hash + digits
+                case_number_fallback: /#\s*([\d\s]{3,})/i, // Fallback for just hash + digits
 
                 // Dates
                 ingress_at: /Fecha\s*de\s*ingreso\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:\s+\d{1,2}:\d{2})?)/i,
-                incident_at: /Fecha\s*(?:del?)?\s*incidente\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:\s+\d{1,2}:\d{2})?)/i,
+                incident_at: /Fecha\s*(?:de\s*los\s*hechos|del?\s*incidente|incidente)\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:\s+\d{1,2}:\d{2})?)/i,
 
                 // PPU
                 ppu: /PPU\s*:\s*([A-Z0-9]{4,8})/i,
 
                 // Location
-                incident_point: /Punto\s*del\s*incidente\s*:\s*(.+?)(?=\s*(?:Motivo|Submotivo|Detalle|$))/i,
+                incident_point: /Punto\s*de\s*(?:los\s*hechos|del\s*incidente)\s*:\s*(.+?)(?=\s*(?:Motivo|Submotivo|Detalle|$))/i,
 
                 // Reason
-                reason: /Motivo\s*del\s*descargo\s*:\s*(.+?)(?=\s*(?:Submotivo|Detalle|DATOS|$))/i,
+                reason: /Motivo\s*(?:del\s*(?:descargo|caso))?\s*:\s*(.+?)(?=\s*(?:Submotivo|Detalle|DATOS|$))/i,
 
                 // Detail - stops at DATOS OB or End of String
                 detail: /Detalle\s*:\s*([\s\S]+?)(?=\s*(?:DATOS\s*OB|$))/i,
             };
 
             // Case Number
-            const caseMatch = cleanContent.match(patterns.case_number);
-            if (caseMatch && caseMatch[1]) {
-                // Remove any spaces captured inside the number
-                result.case_number = caseMatch[1].replace(/\s+/g, '');
+            const strictMatch = cleanContent.match(patterns.case_number_strict);
+            if (strictMatch && strictMatch[0]) {
+                result.case_number = strictMatch[0].trim().toUpperCase();
             } else {
-                const caseFallback = cleanContent.match(patterns.case_number_fallback);
-                if (caseFallback && caseFallback[1]) {
-                    result.case_number = caseFallback[1].replace(/\s+/g, '');
+                const caseMatch = cleanContent.match(patterns.case_number);
+                if (caseMatch && caseMatch[1]) {
+                    // Remove any spaces captured inside the number
+                    result.case_number = caseMatch[1].replace(/\s+/g, '').toUpperCase();
+                } else {
+                    const caseFallback = cleanContent.match(patterns.case_number_fallback);
+                    if (caseFallback && caseFallback[1]) {
+                        result.case_number = caseFallback[1].replace(/\s+/g, '').toUpperCase();
+                    }
                 }
             }
 
@@ -194,4 +202,3 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
         reader.readAsArrayBuffer(file);
     });
 }
-

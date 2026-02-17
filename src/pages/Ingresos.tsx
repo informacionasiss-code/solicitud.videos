@@ -141,9 +141,12 @@ export default function Ingresos() {
                             {[
                                 { label: "Case number #", desc: "Número de caso" },
                                 { label: "Fecha del incidente:", desc: "dd/mm/yyyy" },
+                                { label: "Fecha de los hechos:", desc: "dd/mm/yyyy" },
                                 { label: "Fecha de ingreso:", desc: "dd/mm/yyyy" },
                                 { label: "PPU:", desc: "Patente del vehículo" },
                                 { label: "Punto del incidente:", desc: "Ubicación" },
+                                { label: "Punto de los hechos:", desc: "Ubicación" },
+                                { label: "Motivo del caso:", desc: "Motivo principal" },
                             ].map((item, i) => (
                                 <div key={i} className="helper-list-item">
                                     <code>{item.label}</code>
