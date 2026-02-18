@@ -287,33 +287,33 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             if (detailMatch) result.detail = detailMatch[1].trim();
 
             // Extract operator info
-            // Supports "DATOS OB: NAME RUT" and "DATOS OB: RUT : NAME"
-            const operatorRutFirst = /DATOS\s*OB\s*[:\s]*([0-9]{7,8}-[\dkK])\s*[:\-–]?\s*([A-ZÁÉÍÓÚÑ\s,]+)/i;
-            const operatorNameFirst = /DATOS\s*OB\s*[:\s]*([A-ZÁÉÍÓÚÑ\s,]+?)\s+([0-9]{7,8}-[\dkK])/i;
-            let operatorMatch = cleanContent.match(operatorRutFirst);
+            // Supports "DATOS OB: NAME RUT", "DATOS OB: RUT : NAME", and RUT with dots
+            const rutRegex = /[0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-[\dkK]|[0-9]{7,8}-[\dkK]/i;
+            const obSectionMatch = cleanContent.match(/DATOS\s*OB\s*[:\s]*([\s\S]{0,200}?)(?=\s*(?:PPU|Motivo|Detalle|Fecha|Punto|Servicio|Solicitud|D[ií]as|Plazo|$))/i);
 
-            if (operatorMatch) {
-                result.operator_rut = operatorMatch[1].trim().toUpperCase();
-                result.operator_name = operatorMatch[2].trim().replace(/,\s*$/, '');
-            } else {
-                operatorMatch = cleanContent.match(operatorNameFirst);
-                if (operatorMatch) {
-                    result.operator_name = operatorMatch[1].trim().replace(/,\s*$/, '');
-                    result.operator_rut = operatorMatch[2].trim().toUpperCase();
-                } else {
-                    // Fallback for "Conductor/Chofer"
-                    const altRutFirst = /(?:Conductor|Chofer)\s*[:\s]+([0-9]{7,8}-[\dkK])\s*[:\-–]?\s*([A-ZÁÉÍÓÚÑ\s,]+)/i;
-                    const altNameFirst = /(?:Conductor|Chofer)\s*[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+([0-9]{7,8}-[\dkK])/i;
-                    const altMatch = cleanContent.match(altRutFirst) || cleanContent.match(altNameFirst);
-                    if (altMatch) {
-                        if (altMatch[1].match(/^\d/)) {
-                            result.operator_rut = altMatch[1].trim().toUpperCase();
-                            result.operator_name = altMatch[2].trim().replace(/,\s*$/, '');
-                        } else {
-                            result.operator_name = altMatch[1].trim().replace(/,\s*$/, '');
-                            result.operator_rut = altMatch[2].trim().toUpperCase();
-                        }
-                    }
+            const normalizeRut = (rut: string) => rut.replace(/[.\s]/g, '').toUpperCase();
+            const normalizeName = (name: string) => name.trim().replace(/^[\s:\-–]+|[\s:\-–]+$/g, '').replace(/,\s*$/, '');
+
+            const parseOperatorFromSection = (section: string) => {
+                const rutMatch = section.match(rutRegex);
+                if (!rutMatch) return false;
+                const rut = normalizeRut(rutMatch[0]);
+                const name = normalizeName(section.replace(rutMatch[0], ' '));
+                result.operator_rut = rut;
+                if (name) result.operator_name = name;
+                return true;
+            };
+
+            let operatorParsed = false;
+            if (obSectionMatch && obSectionMatch[1]) {
+                operatorParsed = parseOperatorFromSection(obSectionMatch[1]);
+            }
+
+            if (!operatorParsed) {
+                // Fallback for "Conductor/Chofer"
+                const altSectionMatch = cleanContent.match(/(?:Conductor|Chofer)\s*[:\s]*([\s\S]{0,200}?)(?=\s*(?:PPU|Motivo|Detalle|Fecha|Punto|Servicio|Solicitud|D[ií]as|Plazo|$))/i);
+                if (altSectionMatch && altSectionMatch[1]) {
+                    parseOperatorFromSection(altSectionMatch[1]);
                 }
             }
 
