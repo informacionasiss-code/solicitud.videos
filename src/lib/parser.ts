@@ -19,6 +19,103 @@ function decodeQuotedPrintable(input: string): string {
         .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
+function decodeBase64ToText(input: string): string {
+    const clean = input.replace(/\s+/g, "");
+    try {
+        const binary = atob(clean);
+        const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+        // Try UTF-8 first, fallback to ISO-8859-1
+        try {
+            return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+        } catch {
+            return new TextDecoder("iso-8859-1", { fatal: false }).decode(bytes);
+        }
+    } catch {
+        return input;
+    }
+}
+
+function parseHeadersBlock(headerBlock: string): Record<string, string> {
+    const lines = headerBlock.split(/\r?\n/);
+    const headers: Record<string, string> = {};
+    let currentKey: string | null = null;
+    for (const line of lines) {
+        if (/^\s/.test(line) && currentKey) {
+            headers[currentKey] = `${headers[currentKey]} ${line.trim()}`;
+            continue;
+        }
+        const idx = line.indexOf(":");
+        if (idx === -1) continue;
+        const key = line.slice(0, idx).trim().toLowerCase();
+        const value = line.slice(idx + 1).trim();
+        headers[key] = value;
+        currentKey = key;
+    }
+    return headers;
+}
+
+function extractBoundary(contentType?: string): string | null {
+    if (!contentType) return null;
+    const match = contentType.match(/boundary="?([^";]+)"?/i);
+    return match ? match[1] : null;
+}
+
+function decodeBodyByEncoding(body: string, encoding?: string): string {
+    if (!encoding) return body;
+    const enc = encoding.toLowerCase();
+    if (enc.includes("base64")) return decodeBase64ToText(body);
+    if (enc.includes("quoted-printable")) return decodeQuotedPrintable(body);
+    return body;
+}
+
+function extractBestBody(raw: string): { body: string; subject?: string } {
+    const [headerBlock, ...rest] = raw.split(/\r?\n\r?\n/);
+    const bodyBlock = rest.join("\n\n");
+    const headers = parseHeadersBlock(headerBlock || "");
+    const subject = headers["subject"];
+    const contentType = headers["content-type"];
+    const boundary = extractBoundary(contentType);
+
+    if (!boundary) {
+        return { body: decodeBodyByEncoding(bodyBlock, headers["content-transfer-encoding"]), subject };
+    }
+
+    const boundaryRegex = new RegExp(`--${boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+    const parts = bodyBlock.split(boundaryRegex).slice(1); // skip preamble
+
+    let textPlain: string | undefined;
+    let textHtml: string | undefined;
+
+    for (const part of parts) {
+        if (part.startsWith("--")) break; // end marker
+        const trimmed = part.replace(/^\r?\n/, "");
+        const [partHeaderBlock, ...partRest] = trimmed.split(/\r?\n\r?\n/);
+        const partBody = partRest.join("\n\n");
+        const partHeaders = parseHeadersBlock(partHeaderBlock || "");
+        const partType = (partHeaders["content-type"] || "").toLowerCase();
+        const partEncoding = partHeaders["content-transfer-encoding"];
+
+        // Nested multipart
+        if (partType.includes("multipart/")) {
+            const nested = extractBestBody(`${partHeaderBlock}\n\n${partBody}`);
+            if (nested.body) {
+                if (!textPlain && !textHtml) {
+                    // Prefer first nested body if nothing else
+                    textPlain = nested.body;
+                }
+            }
+            continue;
+        }
+
+        if (partType.includes("text/plain")) {
+            textPlain = decodeBodyByEncoding(partBody, partEncoding);
+        } else if (partType.includes("text/html")) {
+            textHtml = decodeBodyByEncoding(partBody, partEncoding);
+        }
+    }
+
+    return { body: textPlain || textHtml || bodyBlock, subject };
+}
 
 
 function parseSpanishDate(dateStr: string): string | undefined {
@@ -68,7 +165,9 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
         reader.onload = (e) => {
             const arrayBuffer = e.target?.result as ArrayBuffer;
             const decoder = new TextDecoder("iso-8859-1");
-            let content = decoder.decode(arrayBuffer);
+            const rawContent = decoder.decode(arrayBuffer);
+            const { body, subject } = extractBestBody(rawContent);
+            let content = body;
 
             if (content.match(/=[0-9A-F]{2}/i) || content.match(/=\r?\n/)) {
                 content = decodeQuotedPrintable(content);
@@ -97,11 +196,12 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
                 return text.replace(/\s+/g, " ").trim();
             };
 
-            const cleanContent = stripHtml(content);
+            const combinedContent = `${subject ? subject + " " : ""}${content}`;
+            const cleanContent = stripHtml(combinedContent);
 
             const patterns = {
                 // New case format like "608608-20260217-SU3025"
-                case_number_strict: /\b\d{4,}-\d{8}-[A-Z]{2}\d{3,6}\b/i,
+                case_number_strict: /\b\d{4,}\s*-\s*\d{8}\s*-\s*[A-Z]{2}\s*\d{3,6}\b/i,
 
                 // Case number: matches "Caso #12345", "Solicitud 123456",
                 // or new format like "608608-20260217-SU3025"
@@ -129,7 +229,7 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             // Case Number
             const strictMatch = cleanContent.match(patterns.case_number_strict);
             if (strictMatch && strictMatch[0]) {
-                result.case_number = strictMatch[0].trim().toUpperCase();
+                result.case_number = strictMatch[0].replace(/\s+/g, '').trim().toUpperCase();
             } else {
                 const caseMatch = cleanContent.match(patterns.case_number);
                 if (caseMatch && caseMatch[1]) {
