@@ -216,8 +216,9 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
                 // PPU
                 ppu: /PPU\s*:\s*([A-Z0-9]{4,8})/i,
 
-                // Location
-                incident_point: /Punto\s*de\s*(?:los\s*hechos|del\s*incidente)\s*:\s*(.+?)(?=\s*(?:Motivo|Submotivo|Detalle|$))/i,
+                // Location (more robust: Punto/Lugar/Ubicación ...)
+                incident_point: /(?:Punto|Lugar|Ubicaci[oó]n)\s*(?:de\s*)?(?:los\s*hechos|del\s*incidente|del\s*hecho|incidente)?\s*[:\-–]?\s*(.+?)(?=\s*(?:Motivo|Submotivo|Detalle|Servicio|PPU|Fecha|Plazo|DATOS|Datos|D[ií]as|Solicitud|$))/i,
+                incident_point_fallback: /Punto\s*de\s*(?:los\s*hechos|del\s*incidente)\s*(?:\:|\-|\–)\s*([^\n\r]+?)\s*(?=\s*(?:Motivo|Submotivo|Detalle|Servicio|PPU|Fecha|Plazo|DATOS|Datos|D[ií]as|Solicitud|$))/i,
 
                 // Reason
                 reason: /Motivo\s*(?:del\s*(?:descargo|caso))?\s*:\s*(.+?)(?=\s*(?:Submotivo|Detalle|DATOS|$))/i,
@@ -268,7 +269,14 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
 
             // Location
             const pointMatch = cleanContent.match(patterns.incident_point);
-            if (pointMatch) result.incident_point = pointMatch[1].trim();
+            if (pointMatch) {
+                result.incident_point = pointMatch[1].trim();
+            } else {
+                const pointFallback = cleanContent.match(patterns.incident_point_fallback);
+                if (pointFallback) {
+                    result.incident_point = pointFallback[1].trim();
+                }
+            }
 
             // Reason
             const reasonMatch = cleanContent.match(patterns.reason);
