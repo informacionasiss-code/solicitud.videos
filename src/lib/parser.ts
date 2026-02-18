@@ -287,20 +287,33 @@ export async function parseEmlFile(file: File): Promise<ParsedEml> {
             if (detailMatch) result.detail = detailMatch[1].trim();
 
             // Extract operator info
-            // Parses "DATOS OB: NAME RUT" from clean content
-            const operatorPattern = /DATOS\s*OB\s*[:\s]*([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i;
-            const operatorMatch = cleanContent.match(operatorPattern);
+            // Supports "DATOS OB: NAME RUT" and "DATOS OB: RUT : NAME"
+            const operatorRutFirst = /DATOS\s*OB\s*[:\s]*([0-9]{7,8}-[\dkK])\s*[:\-–]?\s*([A-ZÁÉÍÓÚÑ\s,]+)/i;
+            const operatorNameFirst = /DATOS\s*OB\s*[:\s]*([A-ZÁÉÍÓÚÑ\s,]+?)\s+([0-9]{7,8}-[\dkK])/i;
+            let operatorMatch = cleanContent.match(operatorRutFirst);
 
             if (operatorMatch) {
-                result.operator_name = operatorMatch[1].trim().replace(/,\s*$/, '');
-                result.operator_rut = operatorMatch[2].trim().toUpperCase();
+                result.operator_rut = operatorMatch[1].trim().toUpperCase();
+                result.operator_name = operatorMatch[2].trim().replace(/,\s*$/, '');
             } else {
-                // Fallback for "Chofer: ..."
-                const altOpPattern = /(?:Conductor|Chofer)\s*[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+(\d{7,8}-[\dkK])/i;
-                const altMatch = cleanContent.match(altOpPattern);
-                if (altMatch) {
-                    result.operator_name = altMatch[1].trim().replace(/,\s*$/, '');
-                    result.operator_rut = altMatch[2].trim().toUpperCase();
+                operatorMatch = cleanContent.match(operatorNameFirst);
+                if (operatorMatch) {
+                    result.operator_name = operatorMatch[1].trim().replace(/,\s*$/, '');
+                    result.operator_rut = operatorMatch[2].trim().toUpperCase();
+                } else {
+                    // Fallback for "Conductor/Chofer"
+                    const altRutFirst = /(?:Conductor|Chofer)\s*[:\s]+([0-9]{7,8}-[\dkK])\s*[:\-–]?\s*([A-ZÁÉÍÓÚÑ\s,]+)/i;
+                    const altNameFirst = /(?:Conductor|Chofer)\s*[:\s]+([A-ZÁÉÍÓÚÑ\s,]+?)\s+([0-9]{7,8}-[\dkK])/i;
+                    const altMatch = cleanContent.match(altRutFirst) || cleanContent.match(altNameFirst);
+                    if (altMatch) {
+                        if (altMatch[1].match(/^\d/)) {
+                            result.operator_rut = altMatch[1].trim().toUpperCase();
+                            result.operator_name = altMatch[2].trim().replace(/,\s*$/, '');
+                        } else {
+                            result.operator_name = altMatch[1].trim().replace(/,\s*$/, '');
+                            result.operator_rut = altMatch[2].trim().toUpperCase();
+                        }
+                    }
                 }
             }
 
