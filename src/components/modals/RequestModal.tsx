@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dialog"
 import { format } from "date-fns"
 import { RequestForm } from "@/components/forms/RequestForm"
-import { RequestFormValues } from "@/lib/schemas"
+import { RequestFormValues, vacioANulo } from "@/lib/schemas"
 import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
@@ -65,11 +65,11 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
                     // Estos campos existían en el formulario pero no se
                     // guardaban; sin ellos la falla y las observaciones se
                     // perdían al editar.
-                    failure_type: sinDisco ? 'bus_sin_disco' : (values.failure_type || null),
-                    obs: values.obs || null,
-                    fleet_status: values.fleet_status || request.fleet_status || 'desconocido',
+                    failure_type: sinDisco ? 'bus_sin_disco' : (vacioANulo(values.failure_type) || null),
+                    obs: vacioANulo(values.obs) || null,
+                    fleet_status: vacioANulo(values.fleet_status) || request.fleet_status || 'desconocido',
                     sin_disco: sinDisco,
-                    sin_disco_source: sinDisco ? (values.sin_disco_source || 'flota') : null,
+                    sin_disco_source: sinDisco ? (vacioANulo(values.sin_disco_source) || 'flota') : null,
                     updated_at: new Date().toISOString(),
                     status: newStatus
                 })

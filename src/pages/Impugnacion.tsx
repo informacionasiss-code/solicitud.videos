@@ -29,7 +29,12 @@ export default function Impugnacion() {
     const [procesando, setProcesando] = useState(false);
     const [loteActivo, setLoteActivo] = useState<string | null>(null);
     const [busqueda, setBusqueda] = useState("");
-    const [filtro, setFiltro] = useState<"todos" | "flota" | "fuera" | "sin_disco" | "con_video">("todos");
+    const [filtro, setFiltro] = useState<"todos" | "sin_disco" | "con_video" | "pendiente">("todos");
+    // La impugnación es sobre nuestros buses. Las patentes de otros terminales
+    // se conservan -si el padrón estuviera incompleto, descartarlas al importar
+    // las perdería para siempre- pero no se muestran ni se exportan salvo que
+    // se pidan expresamente.
+    const [verOtrosTerminales, setVerOtrosTerminales] = useState(false);
     const [editandoUrl, setEditandoUrl] = useState<string | null>(null);
     const [urlBorrador, setUrlBorrador] = useState("");
 
@@ -96,7 +101,10 @@ export default function Impugnacion() {
                 { duration: 9000 }
             );
             if (resumen.fueraDeFlota > 0) {
-                toast.warning(`${resumen.fueraDeFlota} patente(s) no pertenecen a nuestra flota.`, { duration: 9000 });
+                toast.info(
+                    `${resumen.fueraDeFlota} patente(s) de otros terminales quedaron fuera de la vista.`,
+                    { duration: 9000 }
+                );
             }
         } catch (e) {
             console.error(e);
@@ -177,14 +185,23 @@ export default function Impugnacion() {
     };
 
     // ------------------------------------------------------------- filtrado
+    /** Sólo lo nuestro. Es la base de la tabla, del resumen y del Excel. */
+    const deNuestraFlota = useMemo(
+        () => (filas || []).filter((f) => f.en_flota),
+        [filas]
+    );
+    const otrosTerminales = useMemo(
+        () => (filas || []).filter((f) => !f.en_flota),
+        [filas]
+    );
+
     const visibles = useMemo(() => {
-        if (!filas) return [];
+        const base = verOtrosTerminales ? (filas || []) : deNuestraFlota;
         const q = busqueda.trim().toLowerCase();
-        return filas.filter((f) => {
-            if (filtro === "flota" && !f.en_flota) return false;
-            if (filtro === "fuera" && f.en_flota) return false;
+        return base.filter((f) => {
             if (filtro === "sin_disco" && !f.sin_disco) return false;
             if (filtro === "con_video" && !f.video_url) return false;
+            if (filtro === "pendiente" && (f.video_url || f.sin_disco)) return false;
             if (!q) return true;
             return (
                 f.ppu.toLowerCase().includes(q) ||
@@ -194,15 +211,15 @@ export default function Impugnacion() {
                 (f.zona || "").toLowerCase().includes(q)
             );
         });
-    }, [filas, busqueda, filtro]);
+    }, [filas, deNuestraFlota, verOtrosTerminales, busqueda, filtro]);
 
     const stats = useMemo(() => ({
-        total: filas?.length ?? 0,
-        enFlota: filas?.filter((f) => f.en_flota).length ?? 0,
-        fuera: filas?.filter((f) => !f.en_flota).length ?? 0,
-        sinDisco: filas?.filter((f) => f.sin_disco).length ?? 0,
-        conVideo: filas?.filter((f) => f.video_url).length ?? 0,
-    }), [filas]);
+        total: deNuestraFlota.length,
+        sinDisco: deNuestraFlota.filter((f) => f.sin_disco).length,
+        conVideo: deNuestraFlota.filter((f) => f.video_url).length,
+        pendiente: deNuestraFlota.filter((f) => !f.video_url && !f.sin_disco).length,
+        otros: otrosTerminales.length,
+    }), [deNuestraFlota, otrosTerminales]);
 
     const loteInfo = lotes?.find((l) => l.lote_id === loteSeleccionado);
 
@@ -211,8 +228,9 @@ export default function Impugnacion() {
             <div>
                 <h1 className="text-2xl font-bold text-slate-900">Impugnación</h1>
                 <p className="text-slate-500">
-                    Sube el archivo de requerimientos: se ordena, se cruza contra el padrón de
-                    flota, se marcan los buses sin disco y se exporta a Excel. No envía correos.
+                    Sube el archivo de requerimientos: se ordena, se cruza contra el padrón y se
+                    muestran <strong>sólo los buses de nuestra flota</strong>, con los que no tienen
+                    disco marcados. La exportación a Excel incluye únicamente esos. No envía correos.
                 </p>
             </div>
 
@@ -261,9 +279,13 @@ export default function Impugnacion() {
                     </select>
                     <button
                         onClick={() => {
-                            if (!filas?.length) return toast.error("No hay filas para exportar.");
+                            if (!deNuestraFlota.length) {
+                                return toast.error("No hay filas de nuestra flota para exportar.");
+                            }
                             try {
-                                const nombre = exportarImpugnacionExcel(filas, loteInfo?.archivo || "impugnacion");
+                                // Sólo lo nuestro: la impugnación se presenta
+                                // sobre nuestros buses, no sobre los ajenos.
+                                const nombre = exportarImpugnacionExcel(deNuestraFlota, loteInfo?.archivo || "impugnacion");
                                 toast.success(`Excel descargado: ${nombre}`);
                             } catch (e) {
                                 toast.error(e instanceof Error ? e.message : "Error al exportar");
@@ -272,7 +294,7 @@ export default function Impugnacion() {
                         className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
                     >
                         <Download className="h-4 w-4" />
-                        Descargar Excel
+                        Descargar Excel ({deNuestraFlota.length})
                     </button>
                     <button
                         onClick={() => loteSeleccionado && recruzar.mutate(loteSeleccionado)}
@@ -303,11 +325,10 @@ export default function Impugnacion() {
             {filas && filas.length > 0 && (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
                     {([
-                        { k: "todos", label: "Total", valor: stats.total, clase: "border-slate-200 bg-white text-slate-800" },
-                        { k: "flota", label: "De la flota", valor: stats.enFlota, clase: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-                        { k: "fuera", label: "Fuera de flota", valor: stats.fuera, clase: "border-orange-200 bg-orange-50 text-orange-700" },
-                        { k: "sin_disco", label: "Sin disco", valor: stats.sinDisco, clase: "border-red-200 bg-red-50 text-red-700" },
+                        { k: "todos", label: "De nuestra flota", valor: stats.total, clase: "border-slate-200 bg-white text-slate-800" },
+                        { k: "pendiente", label: "Por revisar", valor: stats.pendiente, clase: "border-amber-200 bg-amber-50 text-amber-700" },
                         { k: "con_video", label: "Con video", valor: stats.conVideo, clase: "border-blue-200 bg-blue-50 text-blue-700" },
+                        { k: "sin_disco", label: "Sin disco", valor: stats.sinDisco, clase: "border-red-200 bg-red-50 text-red-700" },
                     ] as const).map((c) => (
                         <button
                             key={c.k}
@@ -323,14 +344,30 @@ export default function Impugnacion() {
                 </div>
             )}
 
+            {/* Filas de otros terminales: fuera de la vista, pero no perdidas */}
+            {filas && stats.otros > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-sm text-slate-600">
+                        <strong>{stats.otros}</strong> fila(s) del archivo corresponden a patentes
+                        que no están en nuestro padrón. No se muestran ni se exportan.
+                    </p>
+                    <button
+                        onClick={() => setVerOtrosTerminales((v) => !v)}
+                        className="text-xs font-medium text-indigo-600 underline hover:text-indigo-800"
+                    >
+                        {verOtrosTerminales ? "Ocultarlas" : "Ver cuáles son"}
+                    </button>
+                </div>
+            )}
+
             {/* Un porcentaje alto fuera de flota casi nunca significa que sean
                 buses ajenos: significa que al padrón le faltan buses. */}
-            {filas && filas.length > 0 && stats.fuera > stats.enFlota && (
+            {filas && filas.length > 0 && stats.otros > stats.total && (
                 <div className="flex items-start gap-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4">
                     <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                     <div>
                         <h4 className="font-bold text-amber-900">
-                            {stats.fuera} de {stats.total} patentes no están en el padrón
+                            {stats.otros} de {filas.length} patentes no están en el padrón
                         </h4>
                         <p className="mt-1 text-sm text-amber-800">
                             Cuando la mayoría queda fuera de flota, lo habitual no es que sean buses
@@ -380,13 +417,23 @@ export default function Impugnacion() {
                                 {isLoading ? (
                                     <tr><td colSpan={12} className="p-8 text-center text-slate-400">Cargando...</td></tr>
                                 ) : visibles.length === 0 ? (
-                                    <tr><td colSpan={12} className="p-8 text-center text-slate-400">Sin resultados.</td></tr>
+                                    <tr>
+                                        <td colSpan={12} className="p-8 text-center text-slate-400">
+                                            {busqueda
+                                                ? "Ninguna fila coincide con la búsqueda."
+                                                : stats.total === 0 && stats.otros > 0
+                                                    ? "Ninguna patente de este archivo pertenece a nuestra flota."
+                                                    : "Sin resultados para este filtro."}
+                                        </td>
+                                    </tr>
                                 ) : (
                                     visibles.map((f) => (
                                         <tr
                                             key={f.id}
                                             className={`transition-colors hover:bg-slate-50/60 ${
-                                                f.sin_disco ? "bg-red-50/50" : !f.en_flota ? "bg-orange-50/40" : ""
+                                                !f.en_flota
+                                                    ? "bg-orange-50/60 opacity-70"
+                                                    : f.sin_disco ? "bg-red-50/50" : ""
                                             }`}
                                         >
                                             <td className="px-3 py-2 text-slate-400">{f.orden}</td>

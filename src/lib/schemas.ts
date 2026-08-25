@@ -12,6 +12,30 @@ import { z } from "zod";
  */
 const textoOpcional = z.string().nullish();
 
+/**
+ * Campo de lista cerrada que además admite vacío.
+ *
+ * Estos campos llegan de tres sitios con tres formas de "sin valor": `null`
+ * desde Postgres, `undefined` cuando el objeto no trae la clave, y `""` cuando
+ * pasan por un formulario. Un enum a secas sólo acepta sus propios valores, así
+ * que cualquiera de los tres bloqueaba el guardado con un "Invalid input" sobre
+ * un campo que el usuario ni siquiera edita.
+ *
+ * Se admite `""` como valor válido en lugar de transformarlo: una transformación
+ * haría que el tipo de entrada del esquema difiera del de salida, y el
+ * formulario se apoya en que sean el mismo. La conversión de `""` a null se
+ * hace al construir lo que va a la base, con `vacioANulo`.
+ */
+const listaOpcional = <T extends readonly [string, ...string[]]>(valores: T) =>
+    z.union([z.enum(valores), z.literal("")]).nullish();
+
+/** Booleano opcional que admite vacío, por la misma razón. */
+const booleanoOpcional = z.union([z.boolean(), z.literal("")]).nullish();
+
+/** Convierte a null los vacíos antes de escribir en la base. */
+export const vacioANulo = <T>(valor: T | "" | null | undefined): T | null =>
+    valor === "" || valor === undefined ? null : valor;
+
 export const requestSchema = z.object({
     case_number: z.string().min(1, "Número de caso requerido"),
     incident_at: textoOpcional,
@@ -29,9 +53,9 @@ export const requestSchema = z.object({
 
     // Cruce contra el padrón de flota. Los completa el formulario a partir de
     // la verificación de la PPU; no son campos que el usuario escriba.
-    fleet_status: z.enum(['en_flota', 'fuera_de_flota', 'desconocido']).nullish(),
-    sin_disco: z.boolean().nullish(),
-    sin_disco_source: z.enum(['flota', 'bus_failures', 'manual']).nullish(),
+    fleet_status: listaOpcional(['en_flota', 'fuera_de_flota', 'desconocido']),
+    sin_disco: booleanoOpcional,
+    sin_disco_source: listaOpcional(['flota', 'bus_failures', 'manual']),
 });
 
 export const FAILURE_TYPES = {

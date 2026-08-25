@@ -3,7 +3,7 @@ import { useDropzone } from "react-dropzone";
 import { UploadCloud, FileText, Sparkles, CheckCircle, Ban, HardDrive } from "lucide-react";
 import { RequestForm } from "@/components/forms/RequestForm";
 import { parseEmlFile } from "@/lib/parser";
-import { RequestFormValues } from "@/lib/schemas";
+import { RequestFormValues, vacioANulo } from "@/lib/schemas";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import {
@@ -75,12 +75,12 @@ export default function Ingresos() {
                 detail: valores.detail,
                 operator_name: valores.operator_name || null,
                 operator_rut: valores.operator_rut || null,
-                fleet_status: valores.fleet_status || check?.status || "desconocido",
+                fleet_status: vacioANulo(valores.fleet_status) || check?.status || "desconocido",
                 sin_disco: sinDisco,
                 sin_disco_source: sinDisco
-                    ? (valores.sin_disco_source || check?.sinDiscoSource || "flota")
+                    ? (vacioANulo(valores.sin_disco_source) || check?.sinDiscoSource || "flota")
                     : null,
-                failure_type: sinDisco ? "bus_sin_disco" : (valores.failure_type || null),
+                failure_type: sinDisco ? "bus_sin_disco" : (vacioANulo(valores.failure_type) || null),
                 status: sinDisco ? "pendiente_envio" : "pendiente",
             }])
             .select()

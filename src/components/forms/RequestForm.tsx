@@ -1,7 +1,7 @@
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Save, AlertTriangle, CheckCircle, Ban } from "lucide-react";
-import { requestSchema, type RequestFormValues } from "@/lib/schemas";
+import { requestSchema, vacioANulo, type RequestFormValues } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,11 +23,21 @@ import { PpuFleetAlert } from "@/components/fleet/PpuFleetAlert";
  * el formulario trabaja mejor con "" y así el usuario ve un campo vacío, no un
  * campo roto.
  */
+/**
+ * Campos que el usuario escribe. Sólo en éstos tiene sentido cambiar null por
+ * cadena vacía; en los de lista cerrada, "" no es un valor válido y convertirlo
+ * rompería la validación en vez de arreglarla.
+ */
+const CAMPOS_DE_TEXTO = new Set([
+    "case_number", "incident_at", "ingress_at", "ppu", "incident_point",
+    "reason", "detail", "video_url", "obs", "operator_name", "operator_rut",
+]);
+
 function sinNulos(valores?: Partial<RequestFormValues>): Partial<RequestFormValues> {
     if (!valores) return {};
     const salida: Record<string, unknown> = {};
     for (const [clave, valor] of Object.entries(valores)) {
-        salida[clave] = valor === null ? "" : valor;
+        salida[clave] = valor === null && CAMPOS_DE_TEXTO.has(clave) ? "" : valor;
     }
     return salida as Partial<RequestFormValues>;
 }
@@ -178,7 +188,7 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
     const sinDiscoSourceEfectivo = sinDiscoPadron
         ? (fleetCheck?.sinDiscoSource ?? "flota")
         : sinDiscoEfectivo
-            ? (initialValues?.sin_disco_source || "manual")
+            ? (vacioANulo(initialValues?.sin_disco_source) || "manual")
             : null;
 
     const isFueraDeFlota = fleetCheck?.status === "fuera_de_flota";
@@ -204,9 +214,9 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
             // Un 'desconocido' de hoy no debe pisar un 'en_flota' ya verificado.
             fleet_status: fleetCheck && fleetCheck.status !== 'desconocido'
                 ? fleetCheck.status
-                : (initialValues?.fleet_status ?? 'desconocido'),
+                : (vacioANulo(initialValues?.fleet_status) ?? 'desconocido'),
             sin_disco: sinDiscoEfectivo,
-            sin_disco_source: sinDiscoEfectivo ? sinDiscoSourceEfectivo : null,
+            sin_disco_source: sinDiscoEfectivo ? vacioANulo(sinDiscoSourceEfectivo) : null,
             failure_type: sinDiscoEfectivo ? 'bus_sin_disco' : data.failure_type,
         };
 
