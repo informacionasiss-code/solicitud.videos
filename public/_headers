@@ -1,0 +1,25 @@
+# Política de caché.
+#
+# Causa habitual de "pantalla en blanco después del deploy": el navegador o la
+# CDN conservan el index.html viejo, que apunta a /assets/index-ABC123.js. Ese
+# archivo ya no existe tras el nuevo build (el hash cambió), la petición
+# devuelve 404, no se ejecuta nada y queda la página vacía.
+#
+# La regla es simple: el index.html NUNCA se cachea, los assets con hash SIEMPRE.
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Los nombres llevan hash de contenido: si cambia el contenido, cambia el
+# nombre. Por eso se pueden cachear indefinidamente sin riesgo de servir algo
+# obsoleto.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin

@@ -1,0 +1,5 @@
+# La app usa BrowserRouter: las rutas (/portal, /admin/...) sólo existen en el
+# cliente. Sin esta regla el hosting busca un archivo real en esa ruta, no lo
+# encuentra y devuelve 404 o una página en blanco al recargar o al entrar por
+# un enlace directo.
+/*    /index.html   200
