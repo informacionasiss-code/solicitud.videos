@@ -73,3 +73,42 @@ export async function enviarSolicitudSinDisco(
         };
     }
 }
+
+/**
+ * Marca una solicitud ya registrada como "bus sin disco" y la despacha.
+ *
+ * Existe para el atraso que dejó el período en que las alertas no funcionaban:
+ * esas solicitudes entraron como casos normales y siguen esperando un video que
+ * nunca va a existir. Corrige el registro y lo cierra en un solo paso.
+ */
+export async function marcarYEnviarSinDisco(
+    solicitud: Record<string, unknown> & { id: string },
+    origen: "flota" | "bus_failures" = "flota"
+): Promise<EnvioAutomaticoResult> {
+    try {
+        const { data: actualizada, error } = await supabase
+            .from("solicitudes")
+            .update({
+                sin_disco: true,
+                sin_disco_source: origen,
+                failure_type: "bus_sin_disco",
+                // Sin disco no hay grabación: cualquier URL previa es incorrecta.
+                video_url: null,
+                status: "pendiente_envio",
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", solicitud.id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error("[ENVIO-AUTO] No se pudo marcar la solicitud:", error);
+            return { enviado: false, mensaje: `No se pudo marcar la solicitud: ${error.message}` };
+        }
+
+        return await enviarSolicitudSinDisco({ ...actualizada, sin_disco: true });
+    } catch (e) {
+        console.error("[ENVIO-AUTO] Excepción marcando y enviando:", e);
+        return { enviado: false, mensaje: "Error inesperado al marcar y enviar la solicitud." };
+    }
+}

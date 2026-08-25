@@ -3,14 +3,14 @@ import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     UploadCloud, FileSpreadsheet, Download, Loader2, HardDrive, Ban,
-    CheckCircle2, Video, Search, Trash2, ExternalLink, Save, X,
+    CheckCircle2, Video, Search, Trash2, ExternalLink, Save, X, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { parseImpugnacionFile } from "@/lib/impugnacionParser";
 import {
-    cargarLote, exportarImpugnacionExcel, normalizarVideoUrl,
+    cargarLote, recruzarLote, exportarImpugnacionExcel, normalizarVideoUrl,
     ESTADO_LABELS, type ImpugnacionRow, type EstadoImpugnacion, type Lote,
 } from "@/lib/impugnacion";
 import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
@@ -127,6 +127,20 @@ export default function Impugnacion() {
         },
         onSuccess: () => refrescar(),
         onError: (e: Error) => toast.error("No se pudo guardar: " + e.message),
+    });
+
+    const recruzar = useMutation({
+        mutationFn: async (loteId: string) => recruzarLote(loteId),
+        onSuccess: (r) => {
+            refrescar();
+            toast.success(
+                r.cambiados === 0
+                    ? "Recruzado: ninguna fila cambió, el padrón dice lo mismo."
+                    : `Recruzado: ${r.cambiados} fila(s) corregida(s). Ahora ${r.enFlota} de nuestra flota y ${r.sinDisco} sin disco.`,
+                { duration: 10000 }
+            );
+        },
+        onError: (e: Error) => toast.error("No se pudo recruzar: " + e.message),
     });
 
     const borrarLote = useMutation({
@@ -261,6 +275,17 @@ export default function Impugnacion() {
                         Descargar Excel
                     </button>
                     <button
+                        onClick={() => loteSeleccionado && recruzar.mutate(loteSeleccionado)}
+                        disabled={recruzar.isPending || !loteSeleccionado}
+                        title="Vuelve a comparar este lote con el padrón actual, sin perder lo ya revisado"
+                        className="flex items-center gap-2 rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-50"
+                    >
+                        {recruzar.isPending
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <RefreshCw className="h-4 w-4" />}
+                        Recruzar con el padrón
+                    </button>
+                    <button
                         onClick={() => {
                             if (loteSeleccionado && confirm("¿Eliminar este lote completo?")) {
                                 borrarLote.mutate(loteSeleccionado);
@@ -295,6 +320,26 @@ export default function Impugnacion() {
                             <p className="mt-0.5 text-2xl font-bold">{c.valor}</p>
                         </button>
                     ))}
+                </div>
+            )}
+
+            {/* Un porcentaje alto fuera de flota casi nunca significa que sean
+                buses ajenos: significa que al padrón le faltan buses. */}
+            {filas && filas.length > 0 && stats.fuera > stats.enFlota && (
+                <div className="flex items-start gap-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                    <div>
+                        <h4 className="font-bold text-amber-900">
+                            {stats.fuera} de {stats.total} patentes no están en el padrón
+                        </h4>
+                        <p className="mt-1 text-sm text-amber-800">
+                            Cuando la mayoría queda fuera de flota, lo habitual no es que sean buses
+                            ajenos sino que al padrón le falten buses. Completa{" "}
+                            <code className="font-mono text-xs">padron_flota</code> y pulsa
+                            «Recruzar con el padrón»: se corrige este lote sin volver a subir el
+                            archivo y sin perder los videos ya cargados.
+                        </p>
+                    </div>
                 </div>
             )}
 

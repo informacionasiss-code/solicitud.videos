@@ -15,6 +15,23 @@ import { Controller } from "react-hook-form";
 import { checkPpu, normalizePpu, SIN_DISCO_MENSAJE, type FleetCheck } from "@/lib/fleet";
 import { PpuFleetAlert } from "@/components/fleet/PpuFleetAlert";
 
+/**
+ * Convierte los `null` de la base en cadenas vacías.
+ *
+ * Un <input value={null}> deja de ser controlado y React avisa por consola;
+ * además el valor viaja tal cual al validador. El esquema ya tolera null, pero
+ * el formulario trabaja mejor con "" y así el usuario ve un campo vacío, no un
+ * campo roto.
+ */
+function sinNulos(valores?: Partial<RequestFormValues>): Partial<RequestFormValues> {
+    if (!valores) return {};
+    const salida: Record<string, unknown> = {};
+    for (const [clave, valor] of Object.entries(valores)) {
+        salida[clave] = valor === null ? "" : valor;
+    }
+    return salida as Partial<RequestFormValues>;
+}
+
 interface RequestFormProps {
     initialValues?: Partial<RequestFormValues>;
     onSubmit: (data: RequestFormValues) => Promise<void>;
@@ -47,7 +64,7 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
             operator_rut: "",
             failure_type: "",
             status: "pendiente",
-            ...initialValues,
+            ...sinNulos(initialValues),
         },
     });
 

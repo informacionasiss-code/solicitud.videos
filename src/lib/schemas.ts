@@ -1,25 +1,37 @@
 import { z } from "zod";
 
+/**
+ * Campo de texto opcional que además tolera `null`.
+ *
+ * Postgres devuelve `null` -no cadena vacía- en las columnas sin valor, y esos
+ * registros se cargan tal cual en el formulario al editar. Con `.optional()` a
+ * secas, cualquier solicitud sin video, sin observaciones o sin operador
+ * quedaba bloqueada por un "Invalid input" que no dependía de nada que el
+ * usuario pudiera corregir. Un bus sin disco nunca tiene video, así que ésos
+ * fallaban siempre.
+ */
+const textoOpcional = z.string().nullish();
+
 export const requestSchema = z.object({
     case_number: z.string().min(1, "Número de caso requerido"),
-    incident_at: z.string().optional(),
-    ingress_at: z.string().optional(),
+    incident_at: textoOpcional,
+    ingress_at: textoOpcional,
     ppu: z.string().min(4, "PPU requerida"),
-    incident_point: z.string().optional(),
-    reason: z.string().optional(),
-    detail: z.string().optional(),
-    video_url: z.string().optional(),
-    obs: z.string().optional(),
-    operator_name: z.string().optional(),
-    operator_rut: z.string().optional(),
+    incident_point: textoOpcional,
+    reason: textoOpcional,
+    detail: textoOpcional,
+    video_url: textoOpcional,
+    obs: textoOpcional,
+    operator_name: textoOpcional,
+    operator_rut: textoOpcional,
     failure_type: z.any().optional(),
     status: z.enum(['pendiente', 'en_revision', 'revisado', 'pendiente_envio', 'enviado']),
 
     // Cruce contra el padrón de flota. Los completa el formulario a partir de
     // la verificación de la PPU; no son campos que el usuario escriba.
-    fleet_status: z.enum(['en_flota', 'fuera_de_flota', 'desconocido']).optional(),
-    sin_disco: z.boolean().optional(),
-    sin_disco_source: z.enum(['flota', 'bus_failures', 'manual']).optional().nullable(),
+    fleet_status: z.enum(['en_flota', 'fuera_de_flota', 'desconocido']).nullish(),
+    sin_disco: z.boolean().nullish(),
+    sin_disco_source: z.enum(['flota', 'bus_failures', 'manual']).nullish(),
 });
 
 export const FAILURE_TYPES = {

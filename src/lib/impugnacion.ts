@@ -155,6 +155,85 @@ export async function cargarLote(
     };
 }
 
+/**
+ * Vuelve a cruzar un lote ya cargado contra el padrón actual.
+ *
+ * El cruce se congela al cargar el archivo, que es lo correcto para dejar
+ * constancia de lo informado. Pero si el padrón estaba incompleto -buses que
+ * sí son nuestros figurando como ajenos- hace falta poder corregirlo sin
+ * volver a subir el archivo y perder el trabajo de revisión ya hecho.
+ *
+ * Respeta lo que se completó a mano: la URL del video y las observaciones no
+ * se tocan nunca.
+ */
+export async function recruzarLote(
+    loteId: string
+): Promise<ResumenCruce & { cambiados: number }> {
+    const { data, error } = await supabase
+        .from("impugnaciones")
+        .select("*")
+        .eq("lote_id", loteId);
+
+    if (error) throw new Error(`No se pudo leer el lote: ${error.message}`);
+    const filas = (data || []) as ImpugnacionRow[];
+    if (filas.length === 0) throw new Error("El lote no tiene filas.");
+
+    const padron = await traerPadron(filas.map((f) => f.ppu));
+    let cambiados = 0;
+
+    for (const fila of filas) {
+        const bus = padron.get(normalizePpu(fila.ppu));
+        const enFlota = Boolean(bus);
+        const sinDisco = enFlota && bus!.tiene_disco === false;
+        const interno = bus?.interno || null;
+
+        if (
+            fila.en_flota === enFlota &&
+            fila.sin_disco === sinDisco &&
+            (fila.interno || null) === interno
+        ) {
+            continue; // nada que corregir en esta fila
+        }
+
+        // El estado sólo se recalcula cuando el cruce lo determina. Si la fila
+        // ya tenía video, ese avance manda sobre cualquier otra cosa.
+        let estado: EstadoImpugnacion = fila.estado;
+        if (sinDisco) estado = "sin_disco";
+        else if (fila.estado === "sin_disco") estado = fila.video_url ? "con_video" : "pendiente";
+
+        const { error: errUpd } = await supabase
+            .from("impugnaciones")
+            .update({
+                en_flota: enFlota,
+                sin_disco: sinDisco,
+                interno,
+                estado,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", fila.id);
+
+        if (errUpd) {
+            console.error("[IMPUGNACION] Error recruzando fila:", errUpd);
+            continue;
+        }
+        cambiados++;
+    }
+
+    // Recuento sobre el estado nuevo, no sobre el que traían las filas.
+    const recalculadas = filas.map((f) => {
+        const bus = padron.get(normalizePpu(f.ppu));
+        return { enFlota: Boolean(bus), sinDisco: Boolean(bus) && bus!.tiene_disco === false };
+    });
+
+    return {
+        total: filas.length,
+        enFlota: recalculadas.filter((r) => r.enFlota).length,
+        fueraDeFlota: recalculadas.filter((r) => !r.enFlota).length,
+        sinDisco: recalculadas.filter((r) => r.sinDisco).length,
+        cambiados,
+    };
+}
+
 /** Normaliza y valida una URL de video antes de guardarla. */
 export function normalizarVideoUrl(raw: string): { url: string | null; error: string | null } {
     const texto = (raw || "").trim();
@@ -247,7 +326,7 @@ export function exportarImpugnacionExcel(filas: ImpugnacionRow[], nombreArchivo?
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Impugnación");
 
-    const base = (nombreArchivo || "impugnacion").replace(/\.[^.]+$/, "").replace(/[^\w\-]+/g, "_");
+    const base = (nombreArchivo || "impugnacion").replace(/\.[^.]+$/, "").replace(/[^\w-]+/g, "_");
     const nombre = `${base}_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
     XLSX.writeFile(wb, nombre);
     return nombre;
