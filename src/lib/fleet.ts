@@ -28,7 +28,7 @@ export type FleetUnknownReason =
     | "padron_vacio"
     | "error_consulta";
 
-export type SinDiscoSource = "flota" | "bus_failures" | "manual";
+export type SinDiscoSource = "flota" | "manual";
 
 export interface FlotaRow {
     id: string;
@@ -58,7 +58,10 @@ export interface FleetCheck {
     sinDisco: boolean;
     sinDiscoSource: SinDiscoSource | null;
     bus: FlotaRow | null;
-    /** Último reporte de falla registrado para esta PPU, si existe. */
+    /**
+     * Último reporte de falla de esta PPU, sólo informativo. No participa en
+     * la decisión de `sinDisco`.
+     */
     failure: BusFailureRow | null;
     unknownReason: FleetUnknownReason | null;
 }
@@ -199,18 +202,13 @@ export async function checkPpu(rawPpu?: string | null): Promise<FleetCheck> {
         }
 
         // El bus es nuestro: recién ahora importa el disco duro.
-        // El padrón manda; un reporte previo en bus_failures sirve de respaldo
-        // para buses cuya ficha aún no refleja la falla.
-        let sinDisco = false;
-        let sinDiscoSource: SinDiscoSource | null = null;
-
-        if (bus.tiene_disco === false) {
-            sinDisco = true;
-            sinDiscoSource = "flota";
-        } else if (failure?.failure_type === "bus_sin_disco") {
-            sinDisco = true;
-            sinDiscoSource = "bus_failures";
-        }
+        //
+        // El padrón es la ÚNICA fuente de verdad. Antes se consultaba también
+        // `bus_failures`, pero esa tabla es un historial de incidencias, no un
+        // inventario: usarla para decidir mezclaba "este bus tuvo una falla una
+        // vez" con "este bus no tiene disco instalado".
+        const sinDisco = bus.tiene_disco === false;
+        const sinDiscoSource: SinDiscoSource | null = sinDisco ? "flota" : null;
 
         return {
             ppu,
@@ -224,45 +222,6 @@ export async function checkPpu(rawPpu?: string | null): Promise<FleetCheck> {
     } catch (e) {
         console.error("[FLOTA] Excepción en checkPpu:", e);
         return emptyCheck(ppu, "error_consulta");
-    }
-}
-
-/**
- * Deja constancia en el historial de que el bus no tenía disco al tramitar el
- * caso. Es idempotente por caso: reprocesar la misma solicitud no duplica.
- * No lanza — es un registro complementario y no debe voltear el guardado.
- */
-export async function registrarBusSinDisco(
-    ppu: string,
-    caseNumber?: string | null,
-    notes?: string | null
-): Promise<void> {
-    const normalized = normalizePpu(ppu);
-    if (!normalized) return;
-
-    try {
-        if (caseNumber) {
-            const { data: existing } = await supabase
-                .from("bus_failures")
-                .select("id")
-                .eq("ppu", normalized)
-                .eq("failure_type", "bus_sin_disco")
-                .eq("case_number", caseNumber)
-                .limit(1);
-            if (existing && existing.length > 0) return;
-        }
-
-        const { error } = await supabase.from("bus_failures").insert([
-            {
-                ppu: normalized,
-                failure_type: "bus_sin_disco",
-                case_number: caseNumber || null,
-                notes: notes || "Detectado automáticamente: el bus no cuenta con disco duro.",
-            },
-        ]);
-        if (error) console.error("[FLOTA] No se pudo registrar el bus sin disco:", error);
-    } catch (e) {
-        console.error("[FLOTA] Excepción registrando bus sin disco:", e);
     }
 }
 

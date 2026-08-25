@@ -10,10 +10,10 @@ import { toast } from "sonner";
 import {
     checkPpu,
     normalizePpu,
-    registrarBusSinDisco,
     SIN_DISCO_MENSAJE,
     type FleetCheck,
 } from "@/lib/fleet";
+import { enviarSolicitudSinDisco } from "@/lib/envioAutomatico";
 import { PpuFleetAlert } from "@/components/fleet/PpuFleetAlert";
 
 export default function Ingresos() {
@@ -77,7 +77,7 @@ export default function Ingresos() {
 
         try {
             setLoading(true);
-            const { error } = await supabase.from('solicitudes').insert([
+            const { data: creada, error } = await supabase.from('solicitudes').insert([
                 {
                     case_number: values.case_number,
                     incident_at: values.incident_at ? new Date(values.incident_at).toISOString() : null,
@@ -92,23 +92,22 @@ export default function Ingresos() {
                     sin_disco: sinDisco,
                     sin_disco_source: sinDisco ? (values.sin_disco_source || 'flota') : null,
                     failure_type: sinDisco ? 'bus_sin_disco' : (values.failure_type || null),
-                    // Sin disco no hay nada que revisar: el caso queda listo
-                    // para enviar la respuesta en lugar de esperar un video.
+                    // Sin disco no hay nada que revisar; el envío se despacha
+                    // enseguida y el estado final lo fija ese envío.
                     status: sinDisco ? 'pendiente_envio' : 'pendiente'
                 }
-            ]);
+            ]).select().single();
 
             if (error) throw error;
 
             if (sinDisco) {
-                // Historial por bus, para que la falla quede trazada aunque
-                // después se edite la solicitud.
-                await registrarBusSinDisco(
-                    ppu,
-                    values.case_number,
-                    `Solicitud ${values.case_number}: el bus no cuenta con disco duro.`
-                );
-                toast.warning(`Solicitud registrada — ${SIN_DISCO_MENSAJE}`, { duration: 8000 });
+                toast.loading("Bus sin disco: enviando correo...", { id: "envio-auto" });
+                const envio = await enviarSolicitudSinDisco({ ...creada, sin_disco: true });
+                if (envio.enviado) {
+                    toast.success(`✅ ${envio.mensaje}`, { id: "envio-auto", duration: 9000 });
+                } else {
+                    toast.error(`⚠️ ${envio.mensaje}`, { id: "envio-auto", duration: 12000 });
+                }
             } else {
                 toast.success("✅ Solicitud creada exitosamente");
             }

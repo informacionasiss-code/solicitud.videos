@@ -17,10 +17,10 @@ import { sendEmailViaResend } from "@/lib/email";
 import {
     checkPpu,
     normalizePpu,
-    registrarBusSinDisco,
     SIN_DISCO_MENSAJE,
     type FleetCheck,
 } from "@/lib/fleet";
+import { enviarSolicitudSinDisco } from "@/lib/envioAutomatico";
 import { PpuFleetAlert } from "@/components/fleet/PpuFleetAlert";
 
 // Validation Schema
@@ -111,29 +111,30 @@ export function SmartRequestForm() {
                 status: sinDisco ? 'pendiente_envio' : 'pendiente',
             };
 
-            const { error } = await supabase.from("solicitudes").insert([payload]);
+            const { data: creada, error } = await supabase
+                .from("solicitudes")
+                .insert([payload])
+                .select()
+                .single();
 
             if (error) throw error;
 
             if (sinDisco) {
-                await registrarBusSinDisco(
-                    ppu,
-                    data.case_number,
-                    `Solicitud ${data.case_number}: el bus no cuenta con disco duro.`
-                );
-            }
-
-            // Send Email Notification
-            try {
-                // Explicitly send email via Resend
-                const emailResult = await sendEmailViaResend(payload);
-                if (emailResult.success) {
-                    console.log("[EMAIL] Notification sent successfully");
-                } else {
-                    console.warn("[EMAIL] Failed to send notification:", emailResult.message);
+                // Sin disco no hay revisión posible: se responde de inmediato
+                // y el caso queda cerrado.
+                const envio = await enviarSolicitudSinDisco({ ...creada, sin_disco: true });
+                if (!envio.enviado) {
+                    console.warn("[PORTAL] Envío automático fallido:", envio.mensaje);
                 }
-            } catch (e) {
-                console.warn("Email trigger warning:", e);
+            } else {
+                try {
+                    const emailResult = await sendEmailViaResend(creada || payload);
+                    if (!emailResult.success) {
+                        console.warn("[EMAIL] Failed to send notification:", emailResult.message);
+                    }
+                } catch (e) {
+                    console.warn("Email trigger warning:", e);
+                }
             }
 
             toast.success("Solicitud enviada correctamente.");
@@ -161,8 +162,8 @@ export function SmartRequestForm() {
                     Hemos registrado tu solicitud correctamente.
                     {sinDisco && (
                         <span className="block mt-2 font-bold text-red-600">
-                            {SIN_DISCO_MENSAJE}: el bus no cuenta con disco duro, por lo que no
-                            habrá grabación disponible. Quedó registrado en la solicitud.
+                            {SIN_DISCO_MENSAJE}: el bus no cuenta con disco duro, así que no habrá
+                            grabación. La respuesta ya fue enviada por correo y el caso quedó cerrado.
                         </span>
                     )}
                 </p>

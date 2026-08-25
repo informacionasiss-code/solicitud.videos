@@ -8,6 +8,7 @@ import {
     Menu,
     X,
     Bus,
+    Scale,
     ShieldCheck,
     FileInput,
     Lock
@@ -58,6 +59,7 @@ export function AdminLayout() {
         { icon: Users, label: "PPU Agrupados", path: "/admin/agrupados" },
         { icon: Send, label: "Envíos", path: "/admin/envios" },
         { icon: Bus, label: "Buses Sin Disco", path: "/admin/buses-sin-disco" },
+        { icon: Scale, label: "Impugnación", path: "/admin/impugnacion" },
     ];
 
     if (isLoading) return null;

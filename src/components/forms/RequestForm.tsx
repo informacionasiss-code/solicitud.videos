@@ -449,7 +449,8 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
                 )}
                 {sinDiscoEfectivo && !isFueraDeFlota && (
                     <p className="text-xs font-medium text-amber-700">
-                        Se guardará como «Bus sin disco». El correo dirá: «{SIN_DISCO_MENSAJE}».
+                        Al guardar se enviará el correo con «{SIN_DISCO_MENSAJE}» y el caso
+                        quedará cerrado como enviado.
                     </p>
                 )}
                 <Button

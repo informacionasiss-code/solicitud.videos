@@ -137,8 +137,48 @@ create policy "Allow public insert bus_failures"
   to anon
   with check (true);
 
+-- Impugnaciones: requerimientos cargados desde archivo, cruzados con el padrón
+create table impugnaciones (
+  id uuid default uuid_generate_v4() primary key,
+  lote_id uuid not null,
+  archivo text,
+  orden integer,
+  fecha date,
+  unidad text,
+  servicio text,
+  sentido text,
+  hora text,
+  zona text,
+  ppu text not null,
+  ppu_original text,
+  en_flota boolean not null default false,
+  sin_disco boolean not null default false,
+  interno text,
+  video_url text,
+  estado text not null default 'pendiente'
+    check (estado in ('pendiente', 'en_revision', 'con_video', 'sin_disco', 'sin_video', 'no_aplica')),
+  obs text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists impugnaciones_lote_idx on impugnaciones (lote_id, orden);
+create index if not exists impugnaciones_ppu_idx on impugnaciones (ppu);
+
+alter table impugnaciones enable row level security;
+
+create policy "Allow public read impugnaciones"
+  on impugnaciones for select to anon using (true);
+create policy "Allow public insert impugnaciones"
+  on impugnaciones for insert to anon with check (true);
+create policy "Allow public update impugnaciones"
+  on impugnaciones for update to anon using (true);
+create policy "Allow public delete impugnaciones"
+  on impugnaciones for delete to anon using (true);
+
 -- Realtime
 alter publication supabase_realtime add table solicitudes;
 alter publication supabase_realtime add table bus_failures;
 alter publication supabase_realtime add table padron_flota;
+alter publication supabase_realtime add table impugnaciones;
 

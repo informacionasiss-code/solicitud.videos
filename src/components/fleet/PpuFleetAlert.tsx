@@ -64,11 +64,6 @@ export function PpuFleetAlert({ check, isChecking, hideSuccess }: PpuFleetAlertP
 
     // --- Es nuestro pero no tiene disco duro -------------------------------
     if (check.status === "en_flota" && check.sinDisco) {
-        const origen =
-            check.sinDiscoSource === "flota"
-                ? "el padrón de flota"
-                : "un reporte de falla previo";
-
         return (
             <div
                 role="alert"
@@ -85,12 +80,13 @@ export function PpuFleetAlert({ check, isChecking, hideSuccess }: PpuFleetAlertP
                         <p className="mt-1 text-sm text-amber-800">
                             El bus <strong className="font-mono">{check.ppu}</strong>
                             {check.bus?.interno ? ` (interno ${check.bus.interno})` : ""} es de
-                            nuestra flota, pero <strong>no cuenta con disco duro</strong> según{" "}
-                            {origen}. No hay grabación posible para este caso.
+                            nuestra flota, pero <strong>no cuenta con disco duro</strong> según el
+                            padrón. No hay grabación posible para este caso.
                         </p>
                         <p className="mt-2 rounded-md bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900">
-                            Quedará registrado como «Bus sin disco» y el correo indicará:
-                            «{SIN_DISCO_MENSAJE}».
+                            Al guardar se enviará el correo de inmediato con el aviso
+                            «{SIN_DISCO_MENSAJE}» y el caso quedará cerrado como enviado: no hay
+                            revisión que esperar.
                         </p>
                     </div>
                 </div>

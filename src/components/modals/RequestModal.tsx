@@ -10,7 +10,8 @@ import { RequestFormValues } from "@/lib/schemas"
 import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
-import { normalizePpu, registrarBusSinDisco, SIN_DISCO_MENSAJE } from "@/lib/fleet"
+import { normalizePpu } from "@/lib/fleet"
+import { enviarSolicitudSinDisco } from "@/lib/envioAutomatico"
 
 interface RequestModalProps {
     isOpen: boolean
@@ -41,10 +42,7 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
             // Auto-update status logic
             let newStatus = request.status;
             if (sinDisco) {
-                if (!['enviado', 'pendiente_envio'].includes(request.status)) {
-                    newStatus = 'pendiente_envio';
-                    toast.info("Bus sin disco: estado actualizado a Pendiente de Envío");
-                }
+                if (request.status !== 'enviado') newStatus = 'pendiente_envio';
             } else if (videoUrl && videoUrl !== request.video_url) {
                 if (['pendiente', 'en_revision'].includes(request.status)) {
                     newStatus = 'pendiente_envio';
@@ -79,13 +77,25 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
 
             if (error) throw error
 
-            if (sinDisco) {
-                await registrarBusSinDisco(
+            // Si al editar resulta que el bus no tiene disco y el caso aún no
+            // se ha respondido, se despacha en el momento: no hay nada que
+            // esperar. Un caso ya enviado no se reenvía.
+            if (sinDisco && request.status !== 'enviado') {
+                toast.loading("Bus sin disco: enviando correo...", { id: "envio-auto" })
+                const envio = await enviarSolicitudSinDisco({
+                    ...request,
+                    ...values,
+                    id: request.id,
                     ppu,
-                    values.case_number,
-                    `Solicitud ${values.case_number}: el bus no cuenta con disco duro.`
-                )
-                toast.warning(`Solicitud actualizada — ${SIN_DISCO_MENSAJE}`, { duration: 8000 })
+                    sin_disco: true,
+                    failure_type: 'bus_sin_disco',
+                    video_url: null,
+                })
+                if (envio.enviado) {
+                    toast.success(`✅ ${envio.mensaje}`, { id: "envio-auto", duration: 9000 })
+                } else {
+                    toast.error(`⚠️ ${envio.mensaje}`, { id: "envio-auto", duration: 12000 })
+                }
             } else {
                 toast.success("Solicitud actualizada")
             }

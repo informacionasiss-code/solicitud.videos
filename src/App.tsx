@@ -13,6 +13,7 @@ import Registros from "@/pages/Registros";
 import Envios from "@/pages/Envios";
 import PPUAgrupados from "@/pages/PPUAgrupados";
 import BusesSinDisco from "@/pages/BusesSinDisco";
+import Impugnacion from "@/pages/Impugnacion";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ function App() {
               <Route path="agrupados" element={<PPUAgrupados />} />
               <Route path="envios" element={<Envios />} />
               <Route path="buses-sin-disco" element={<BusesSinDisco />} />
+              <Route path="impugnacion" element={<Impugnacion />} />
             </Route>
 
             {/* Root Redirect */}
