@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
-import { normalizePpu, type FlotaRow } from "@/lib/fleet";
+import { normalizePpu, SIN_DISCO_MENSAJE, type FlotaRow } from "@/lib/fleet";
 import type { FilaImpugnacion } from "@/lib/impugnacionParser";
 
 // ============================================================================
@@ -47,6 +47,19 @@ export interface ImpugnacionRow {
     created_at: string;
     updated_at: string;
 }
+
+/**
+ * Texto que se deja en observaciones cuando el bus no tiene disco.
+ *
+ * El estado ya lo indica con una etiqueta, pero el Excel que se entrega se lee
+ * fuera de la aplicación: ahí hace falta que el motivo esté escrito en la fila,
+ * no codificado en un color o en una columna aparte.
+ */
+export const OBS_SIN_DISCO = SIN_DISCO_MENSAJE;
+
+/** ¿La observación es la puesta automáticamente, y no algo escrito a mano? */
+const esObsAutomatica = (obs: string | null | undefined): boolean =>
+    !obs || obs.trim() === "" || obs.trim().toUpperCase() === OBS_SIN_DISCO;
 
 export interface Lote {
     lote_id: string;
@@ -129,6 +142,7 @@ export async function cargarLote(
             interno: bus?.interno || null,
             // Un bus sin disco ya tiene desenlace: no hay revisión que hacer.
             estado: (sinDisco ? "sin_disco" : "pendiente") as EstadoImpugnacion,
+            obs: sinDisco ? OBS_SIN_DISCO : null,
         };
     });
 
@@ -187,10 +201,15 @@ export async function recruzarLote(
         const sinDisco = enFlota && bus!.tiene_disco === false;
         const interno = bus?.interno || null;
 
+        const obsEsperada = esObsAutomatica(fila.obs)
+            ? (sinDisco ? OBS_SIN_DISCO : null)
+            : fila.obs;
+
         if (
             fila.en_flota === enFlota &&
             fila.sin_disco === sinDisco &&
-            (fila.interno || null) === interno
+            (fila.interno || null) === interno &&
+            (fila.obs || null) === (obsEsperada || null)
         ) {
             continue; // nada que corregir en esta fila
         }
@@ -201,6 +220,13 @@ export async function recruzarLote(
         if (sinDisco) estado = "sin_disco";
         else if (fila.estado === "sin_disco") estado = fila.video_url ? "con_video" : "pendiente";
 
+        // La observación se sincroniza sólo si nadie escribió nada propio: una
+        // nota puesta a mano vale más que el texto automático.
+        let obs = fila.obs;
+        if (esObsAutomatica(fila.obs)) {
+            obs = sinDisco ? OBS_SIN_DISCO : null;
+        }
+
         const { error: errUpd } = await supabase
             .from("impugnaciones")
             .update({
@@ -208,6 +234,7 @@ export async function recruzarLote(
                 sin_disco: sinDisco,
                 interno,
                 estado,
+                obs,
                 updated_at: new Date().toISOString(),
             })
             .eq("id", fila.id);
@@ -283,7 +310,7 @@ export function exportarImpugnacionExcel(filas: ImpugnacionRow[], nombreArchivo?
         "Sin disco duro": f.sin_disco ? "SIN DISCO" : "",
         Estado: ESTADO_LABELS[f.estado] || f.estado,
         "URL Video": f.video_url || "",
-        Observaciones: f.obs || "",
+        Observaciones: f.obs || (f.sin_disco ? OBS_SIN_DISCO : ""),
     }));
 
     const ws = XLSX.utils.json_to_sheet(datos);

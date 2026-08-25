@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { parseImpugnacionFile } from "@/lib/impugnacionParser";
 import {
     cargarLote, recruzarLote, exportarImpugnacionExcel, normalizarVideoUrl,
-    ESTADO_LABELS, type ImpugnacionRow, type EstadoImpugnacion, type Lote,
+    ESTADO_LABELS, OBS_SIN_DISCO, type ImpugnacionRow, type EstadoImpugnacion, type Lote,
 } from "@/lib/impugnacion";
 import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
 
@@ -37,6 +37,8 @@ export default function Impugnacion() {
     const [verOtrosTerminales, setVerOtrosTerminales] = useState(false);
     const [editandoUrl, setEditandoUrl] = useState<string | null>(null);
     const [urlBorrador, setUrlBorrador] = useState("");
+    const [editandoObs, setEditandoObs] = useState<string | null>(null);
+    const [obsBorrador, setObsBorrador] = useState("");
 
     // ---------------------------------------------------------------- lotes
     const { data: lotes } = useQuery({
@@ -182,6 +184,13 @@ export default function Impugnacion() {
         actualizar.mutate({ id: fila.id, cambios: { video_url: url, estado: nuevoEstado } });
         setEditandoUrl(null);
         setUrlBorrador("");
+    };
+
+    const guardarObs = (fila: ImpugnacionRow) => {
+        const texto = obsBorrador.trim();
+        actualizar.mutate({ id: fila.id, cambios: { obs: texto || null } });
+        setEditandoObs(null);
+        setObsBorrador("");
     };
 
     // ------------------------------------------------------------- filtrado
@@ -411,14 +420,15 @@ export default function Impugnacion() {
                                     <th className="px-3 py-3">Flota</th>
                                     <th className="px-3 py-3">Estado</th>
                                     <th className="px-3 py-3 min-w-[220px]">Video</th>
+                                    <th className="px-3 py-3 min-w-[220px]">Observaciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {isLoading ? (
-                                    <tr><td colSpan={12} className="p-8 text-center text-slate-400">Cargando...</td></tr>
+                                    <tr><td colSpan={13} className="p-8 text-center text-slate-400">Cargando...</td></tr>
                                 ) : visibles.length === 0 ? (
                                     <tr>
-                                        <td colSpan={12} className="p-8 text-center text-slate-400">
+                                        <td colSpan={13} className="p-8 text-center text-slate-400">
                                             {busqueda
                                                 ? "Ninguna fila coincide con la búsqueda."
                                                 : stats.total === 0 && stats.otros > 0
@@ -546,6 +556,59 @@ export default function Impugnacion() {
                                                         className="text-xs text-indigo-600 hover:underline"
                                                     >
                                                         + Agregar URL
+                                                    </button>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                {editandoObs === f.id ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            autoFocus
+                                                            value={obsBorrador}
+                                                            onChange={(e) => setObsBorrador(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter") guardarObs(f);
+                                                                if (e.key === "Escape") setEditandoObs(null);
+                                                            }}
+                                                            placeholder="Observación..."
+                                                            className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
+                                                        />
+                                                        <button
+                                                            onClick={() => guardarObs(f)}
+                                                            className="rounded p-1 text-emerald-600 hover:bg-emerald-50"
+                                                            title="Guardar"
+                                                        >
+                                                            <Save className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditandoObs(null)}
+                                                            className="rounded p-1 text-slate-400 hover:bg-slate-100"
+                                                            title="Cancelar"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => { setEditandoObs(f.id); setObsBorrador(f.obs || ""); }}
+                                                        className="w-full text-left"
+                                                        title="Editar observación"
+                                                    >
+                                                        {f.obs ? (
+                                                            <span className={`text-xs ${f.sin_disco && f.obs === OBS_SIN_DISCO
+                                                                ? "font-bold text-red-700"
+                                                                : "text-slate-700"}`}>
+                                                                {f.obs}
+                                                            </span>
+                                                        ) : f.sin_disco ? (
+                                                            <span className="text-xs font-bold text-red-700">
+                                                                {OBS_SIN_DISCO}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-400 hover:text-indigo-600">
+                                                                + Agregar
+                                                            </span>
+                                                        )}
                                                     </button>
                                                 )}
                                             </td>
