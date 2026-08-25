@@ -20,7 +20,7 @@
 --   notas        texto libre                       (opcional)
 -- ---------------------------------------------------------------------------
 
-insert into flota (ppu, interno, terminal, modelo, tiene_disco, activo, notas) values
+insert into padron_flota (ppu, interno, terminal, modelo, tiene_disco, activo, notas) values
   ('BXGH12', '1001', 'El Roble', 'Marcopolo', true,  true, null),
   ('CJKL34', '1002', 'El Roble', 'Caio',      true,  true, null),
   -- Ejemplo de bus SIN disco duro: genera el aviso y el correo
@@ -38,14 +38,14 @@ on conflict (ppu) do update set
 -- ---------------------------------------------------------------------------
 -- Si solo hay una lista de patentes y todas tienen disco:
 -- ---------------------------------------------------------------------------
--- insert into flota (ppu)
+-- insert into padron_flota (ppu)
 -- select unnest(array['BXGH12','CJKL34','DMNP56'])
 -- on conflict (ppu) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- Marcar buses sin disco duro sobre un padrón ya cargado:
 -- ---------------------------------------------------------------------------
--- update flota
+-- update padron_flota
 --    set tiene_disco = false,
 --        notas = coalesce(notas, 'Sin disco duro instalado')
 --  where ppu in ('DMNP56', 'XXYY99');
@@ -53,6 +53,6 @@ on conflict (ppu) do update set
 -- ---------------------------------------------------------------------------
 -- Verificaciones
 -- ---------------------------------------------------------------------------
--- select count(*) as total_flota from flota;
--- select count(*) as sin_disco from flota where tiene_disco = false;
--- select ppu, interno, terminal from flota where tiene_disco = false order by ppu;
+-- select count(*) as total_flota from padron_flota;
+-- select count(*) as sin_disco from padron_flota where tiene_disco = false;
+-- select ppu, interno, terminal from padron_flota where tiene_disco = false order by ppu;

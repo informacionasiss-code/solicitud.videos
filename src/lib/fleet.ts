@@ -1,5 +1,14 @@
 import { supabase } from "@/lib/supabase";
 
+/**
+ * Tabla del padrón de flota.
+ *
+ * Se llama `padron_flota` y no `flota` porque en esta base ya existe una tabla
+ * `flota` perteneciente a otro sistema. Compartir el nombre haría que esta app
+ * leyera —y una migración escribiera— datos ajenos.
+ */
+const TABLA_PADRON = "padron_flota";
+
 // ============================================================================
 // Cruce de una PPU contra el padrón de flota y contra el historial de fallas.
 //
@@ -116,7 +125,7 @@ async function getPadronStatus(): Promise<{ loaded: boolean; missing: boolean }>
     }
 
     const { count, error } = await supabase
-        .from("flota")
+        .from(TABLA_PADRON)
         .select("id", { count: "exact", head: true });
 
     if (error) {
@@ -148,7 +157,7 @@ export async function checkPpu(rawPpu?: string | null): Promise<FleetCheck> {
 
     try {
         const [flotaRes, failureRes, padron] = await Promise.all([
-            supabase.from("flota").select("*").eq("ppu", ppu).maybeSingle(),
+            supabase.from(TABLA_PADRON).select("*").eq("ppu", ppu).maybeSingle(),
             supabase
                 .from("bus_failures")
                 .select("*")

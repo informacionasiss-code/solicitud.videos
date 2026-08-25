@@ -36,7 +36,7 @@ create index if not exists solicitudes_fleet_status_idx on solicitudes (fleet_st
 
 -- Padrón de flota: la fuente de verdad sobre qué buses son nuestros y
 -- cuáles cuentan con disco duro instalado.
-create table flota (
+create table padron_flota (
   id uuid default uuid_generate_v4() primary key,
   ppu text not null unique,   -- normalizada: sólo A-Z0-9, en mayúsculas
   interno text,
@@ -49,10 +49,10 @@ create table flota (
   updated_at timestamptz default now()
 );
 
-create index if not exists flota_ppu_idx on flota (ppu);
-create index if not exists flota_tiene_disco_idx on flota (tiene_disco) where tiene_disco = false;
+create index if not exists padron_flota_ppu_idx on padron_flota (ppu);
+create index if not exists padron_flota_tiene_disco_idx on padron_flota (tiene_disco) where tiene_disco = false;
 
-create or replace function flota_normaliza_ppu()
+create or replace function padron_padron_flota_normaliza_ppu()
 returns trigger
 language plpgsql
 as $$
@@ -63,10 +63,10 @@ begin
 end;
 $$;
 
-drop trigger if exists flota_normaliza_ppu_trg on flota;
-create trigger flota_normaliza_ppu_trg
-  before insert or update on flota
-  for each row execute function flota_normaliza_ppu();
+drop trigger if exists padron_flota_normaliza_ppu_trg on padron_flota;
+create trigger padron_flota_normaliza_ppu_trg
+  before insert or update on padron_flota
+  for each row execute function padron_padron_flota_normaliza_ppu();
 
 -- Bus Failures History Table (track issues per bus)
 create table bus_failures (
@@ -102,25 +102,25 @@ create policy "Allow public delete access"
   using (true);
 
 -- RLS Policies for flota
-alter table flota enable row level security;
+alter table padron_flota enable row level security;
 
-create policy "Allow public read flota"
-  on flota for select
+create policy "Allow public read padron_flota"
+  on padron_flota for select
   to anon
   using (true);
 
-create policy "Allow public insert flota"
-  on flota for insert
+create policy "Allow public insert padron_flota"
+  on padron_flota for insert
   to anon
   with check (true);
 
-create policy "Allow public update flota"
-  on flota for update
+create policy "Allow public update padron_flota"
+  on padron_flota for update
   to anon
   using (true);
 
-create policy "Allow public delete flota"
-  on flota for delete
+create policy "Allow public delete padron_flota"
+  on padron_flota for delete
   to anon
   using (true);
 
@@ -140,5 +140,5 @@ create policy "Allow public insert bus_failures"
 -- Realtime
 alter publication supabase_realtime add table solicitudes;
 alter publication supabase_realtime add table bus_failures;
-alter publication supabase_realtime add table flota;
+alter publication supabase_realtime add table padron_flota;
 

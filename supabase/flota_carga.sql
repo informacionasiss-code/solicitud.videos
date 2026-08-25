@@ -22,9 +22,11 @@
 -- CONFLICTOS DETECTADOS EN LA TRANSCRIPCIÓN — RESOLVER ANTES DE EJECUTAR
 --
 --   [1] PFYC65 aparece dos veces: interno 1753 e interno 1912.
---       Una de las dos patentes está mal leída. Tal como está, el
---       `on conflict (ppu) do update` conserva solo la última (1912) y el bus
---       1753 queda FUERA del padrón — sus casos se bloquearían.
+--       Una de las dos patentes está mal leída. Postgres RECHAZA la carga
+--       completa si una PPU se repite, así que la fila del interno 1912 quedó
+--       comentada más abajo y el bus 1912 NO está en el padrón: hasta que se
+--       corrija, sus solicitudes se bloquearán como "fuera de flota".
+--       Total cargado: 186 patentes de las 187 leídas.
 --
 --   [2] El interno 1705 aparece dos veces: PFTW57 y PFTW46.
 --       Uno de los dos internos está mal leído (¿1703? ¿1706?). No rompe la
@@ -40,7 +42,7 @@ begin;
 -- 1. Padrón: todas las PPU con su número interno.
 --    Se cargan con tiene_disco = true; los sin disco se marcan en el paso 2.
 -- ---------------------------------------------------------------------------
-insert into flota (ppu, interno, terminal) values
+insert into padron_flota (ppu, interno, terminal) values
   ('SHXD75', '1455', 'US El Roble'),
   ('SHXD77', '1456', 'US El Roble'),
   ('SHXD95', '1457', 'US El Roble'),
@@ -109,7 +111,7 @@ insert into flota (ppu, interno, terminal) values
   ('PFYC58', '1746', 'US El Roble'),
   ('PFYC60', '1748', 'US El Roble'),
   ('PFYC64', '1752', 'US El Roble'),
-  ('PFYC65', '1753', 'US El Roble'),   -- CONFLICTO [1]: repetida con interno 1912
+  ('PFYC65', '1753', 'US El Roble'),   -- ver CONFLICTO [1] en el encabezado
   ('PFYC68', '1754', 'US El Roble'),
   ('PFYC69', '1755', 'US El Roble'),
   ('PFYC70', '1756', 'US El Roble'),
@@ -182,7 +184,13 @@ insert into flota (ppu, interno, terminal) values
   ('PFVG89', '1909', 'US El Roble'),
   ('PFVG95', '1910', 'US El Roble'),
   ('PFVG96', '1911', 'US El Roble'),
-  ('PFYC65', '1912', 'US El Roble'),   -- CONFLICTO [1]: repetida con interno 1753
+  -- CONFLICTO [1] SIN RESOLVER: 'PFYC65' ya está cargada con interno 1753.
+  -- Postgres rechaza la carga entera si una PPU aparece dos veces, así que esta
+  -- fila queda comentada. Se conservó la del interno 1753 porque cae dentro de
+  -- una secuencia densa y consistente (1752-1753-1754), mientras que ésta es
+  -- una fila suelta: lo más probable es que aquí yo haya leído mal la patente.
+  -- >>> CORREGIR: mirar la planilla y poner la patente real del interno 1912.
+  -- ('PFYC65', '1912', 'US El Roble'),
   ('PFYC77', '1913', 'US El Roble'),
   ('PFTW38', '1914', 'US El Roble'),
   ('PFYC90', '1915', 'US El Roble'),
@@ -240,7 +248,7 @@ on conflict (ppu) do update set
 --    Completa la lista con TODAS las patentes marcadas en rojo; abajo va la
 --    única que pude distinguir con certeza en la captura.
 -- ---------------------------------------------------------------------------
-update flota
+update padron_flota
    set tiene_disco = false,
        notas       = coalesce(notas, 'Sin disco duro instalado'),
        updated_at  = now()
@@ -260,11 +268,11 @@ select
   count(*)                                as total_flota,
   count(*) filter (where tiene_disco)     as con_disco,
   count(*) filter (where not tiene_disco) as sin_disco
-from flota;
+from padron_flota;
 
 -- 3.2 Buses marcados sin disco. Debe coincidir con las filas rojas.
 select ppu, interno, notas
-  from flota
+  from padron_flota
  where not tiene_disco
  order by interno;
 
@@ -278,7 +286,7 @@ select s.ppu,
        count(*)        as solicitudes,
        max(s.created_at) as ultima
   from solicitudes s
-  left join flota f on f.ppu = s.ppu
+  left join padron_flota f on f.ppu = s.ppu
  where s.ppu is not null
    and f.id is null
  group by s.ppu
@@ -286,7 +294,7 @@ select s.ppu,
 
 -- 3.4 Internos duplicados: delatan un error de alineación al transcribir.
 select interno, count(*), string_agg(ppu, ', ')
-  from flota
+  from padron_flota
  where interno is not null
  group by interno
 having count(*) > 1

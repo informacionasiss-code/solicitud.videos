@@ -9,8 +9,12 @@
 
 -- ---------------------------------------------------------------------------
 -- 1. Padrón de flota
+--
+-- La tabla se llama `padron_flota` y no `flota` a propósito: en esta base ya
+-- existe una tabla `flota` de otro sistema, y un nombre compartido llevaría a
+-- que una migración de aquí modificara datos ajenos.
 -- ---------------------------------------------------------------------------
-create table if not exists flota (
+create table if not exists padron_flota (
   id uuid default uuid_generate_v4() primary key,
 
   -- PPU normalizada: solo A-Z y 0-9, en mayúsculas, sin puntos ni guiones.
@@ -36,11 +40,11 @@ create table if not exists flota (
   updated_at timestamptz default now()
 );
 
-create index if not exists flota_ppu_idx on flota (ppu);
-create index if not exists flota_tiene_disco_idx on flota (tiene_disco) where tiene_disco = false;
+create index if not exists padron_flota_ppu_idx on padron_flota (ppu);
+create index if not exists padron_flota_tiene_disco_idx on padron_flota (tiene_disco) where tiene_disco = false;
 
 -- Normalización defensiva de la PPU en cualquier insert/update.
-create or replace function flota_normaliza_ppu()
+create or replace function padron_padron_flota_normaliza_ppu()
 returns trigger
 language plpgsql
 as $$
@@ -51,10 +55,10 @@ begin
 end;
 $$;
 
-drop trigger if exists flota_normaliza_ppu_trg on flota;
-create trigger flota_normaliza_ppu_trg
-  before insert or update on flota
-  for each row execute function flota_normaliza_ppu();
+drop trigger if exists padron_flota_normaliza_ppu_trg on padron_flota;
+create trigger padron_flota_normaliza_ppu_trg
+  before insert or update on padron_flota
+  for each row execute function padron_padron_flota_normaliza_ppu();
 
 -- ---------------------------------------------------------------------------
 -- 2. Campos de control en solicitudes
@@ -85,29 +89,29 @@ create index if not exists solicitudes_fleet_status_idx on solicitudes (fleet_st
 -- ---------------------------------------------------------------------------
 -- 3. RLS (mismo criterio que las tablas existentes)
 -- ---------------------------------------------------------------------------
-alter table flota enable row level security;
+alter table padron_flota enable row level security;
 
-drop policy if exists "Allow public read flota" on flota;
-create policy "Allow public read flota"
-  on flota for select
+drop policy if exists "Allow public read padron_flota" on padron_flota;
+create policy "Allow public read padron_flota"
+  on padron_flota for select
   to anon
   using (true);
 
-drop policy if exists "Allow public insert flota" on flota;
-create policy "Allow public insert flota"
-  on flota for insert
+drop policy if exists "Allow public insert padron_flota" on padron_flota;
+create policy "Allow public insert padron_flota"
+  on padron_flota for insert
   to anon
   with check (true);
 
-drop policy if exists "Allow public update flota" on flota;
-create policy "Allow public update flota"
-  on flota for update
+drop policy if exists "Allow public update padron_flota" on padron_flota;
+create policy "Allow public update padron_flota"
+  on padron_flota for update
   to anon
   using (true);
 
-drop policy if exists "Allow public delete flota" on flota;
-create policy "Allow public delete flota"
-  on flota for delete
+drop policy if exists "Allow public delete padron_flota" on padron_flota;
+create policy "Allow public delete padron_flota"
+  on padron_flota for delete
   to anon
   using (true);
 
@@ -116,7 +120,7 @@ create policy "Allow public delete flota"
 -- ---------------------------------------------------------------------------
 do $$
 begin
-  alter publication supabase_realtime add table flota;
+  alter publication supabase_realtime add table padron_flota;
 exception
   when duplicate_object then null;
 end;
