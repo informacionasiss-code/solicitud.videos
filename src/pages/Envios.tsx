@@ -4,10 +4,12 @@ import { DataTable } from "@/components/tables/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Send, CheckCircle, Mail, Sparkles } from "lucide-react";
+import { Send, CheckCircle, Mail, Sparkles, HardDrive } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { EmailDrawer } from "@/components/drawers/EmailDrawer";
+import { esBusSinDisco } from "@/lib/email";
+import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
 
 export default function Envios() {
     const [previewRequest, setPreviewRequest] = useState<any>(null);
@@ -15,16 +17,31 @@ export default function Envios() {
     const { data, refetch } = useQuery({
         queryKey: ['solicitudes-envios'],
         queryFn: async () => {
-            // Show any request that has a video AND is not yet sent
+            // Pendientes de envío: los que ya tienen video, y también los buses
+            // sin disco duro — esos nunca tendrán video y aun así hay que
+            // responder el caso informando que no hay grabación.
             const { data, error } = await supabase
+                .from('solicitudes')
+                .select('*')
+                .or('video_url.not.is.null,sin_disco.is.true')
+                .neq('status', 'enviado')
+                .order('updated_at', { ascending: false });
+
+            if (!error) return data;
+
+            // La columna `sin_disco` llega con la migración de flota. Mientras
+            // no esté aplicada, se mantiene el comportamiento anterior en vez
+            // de dejar la pantalla en blanco.
+            console.warn('[ENVIOS] Consulta con sin_disco falló, usando fallback:', error);
+            const fallback = await supabase
                 .from('solicitudes')
                 .select('*')
                 .not('video_url', 'is', null)
                 .neq('status', 'enviado')
                 .order('updated_at', { ascending: false });
 
-            if (error) throw error;
-            return data;
+            if (fallback.error) throw fallback.error;
+            return fallback.data;
         },
     });
 
@@ -67,6 +84,17 @@ export default function Envios() {
             header: "Video",
             cell: ({ row }) => {
                 const url = row.getValue("video_url");
+                if (esBusSinDisco(row.original)) {
+                    return (
+                        <Badge
+                            className="bg-red-100 text-red-700 border-red-300 border font-semibold"
+                            title={SIN_DISCO_MENSAJE}
+                        >
+                            <HardDrive className="h-3 w-3 mr-1" />
+                            Sin disco
+                        </Badge>
+                    );
+                }
                 return url ? (
                     <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 border font-medium">
                         <CheckCircle className="h-3 w-3 mr-1" />
@@ -126,7 +154,7 @@ export default function Envios() {
                         <Sparkles className="h-8 w-8 text-slate-500" />
                     </div>
                     <h3 className="text-lg font-semibold text-slate-900">No hay envíos pendientes</h3>
-                    <p className="text-sm text-slate-500 mt-1">Cuando agregues un video a una solicitud, aparecerá aquí automáticamente.</p>
+                    <p className="text-sm text-slate-500 mt-1">Aquí aparecen las solicitudes con video listo y los buses sin disco duro, que se responden sin grabación.</p>
                 </div>
             )}
 

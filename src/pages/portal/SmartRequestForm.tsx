@@ -14,6 +14,14 @@ import {
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { sendEmailViaResend } from "@/lib/email";
+import {
+    checkPpu,
+    normalizePpu,
+    registrarBusSinDisco,
+    SIN_DISCO_MENSAJE,
+    type FleetCheck,
+} from "@/lib/fleet";
+import { PpuFleetAlert } from "@/components/fleet/PpuFleetAlert";
 
 // Validation Schema
 const requestSchema = z.object({
@@ -30,7 +38,7 @@ type RequestFormData = z.infer<typeof requestSchema>;
 
 export function SmartRequestForm() {
     const [isCheckingPPU, setIsCheckingPPU] = useState(false);
-    const [busFailure, setBusFailure] = useState<any | null>(null);
+    const [fleetCheck, setFleetCheck] = useState<FleetCheck | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showForm, setShowForm] = useState(true);
 
@@ -45,58 +53,75 @@ export function SmartRequestForm() {
 
     const ppuValue = watch("ppu");
 
-    // Real-time PPU Check
+    // Cruce en vivo de la PPU contra el padrón de flota.
     useEffect(() => {
-        const checkPPU = async () => {
-            if (!ppuValue || ppuValue.length < 4) {
-                setBusFailure(null);
-                return;
+        const normalized = normalizePpu(ppuValue);
+
+        if (normalized.length < 4) {
+            setIsCheckingPPU(false);
+            setFleetCheck(null);
+            return;
+        }
+
+        let cancelled = false;
+        setIsCheckingPPU(true);
+
+        const timeoutId = setTimeout(async () => {
+            const result = await checkPpu(normalized);
+            if (cancelled) return;
+
+            setFleetCheck(result);
+            setIsCheckingPPU(false);
+
+            if (result.status === "fuera_de_flota") {
+                toast.error(`La PPU ${result.ppu} no pertenece a nuestra flota.`, { duration: 10000 });
+            } else if (result.sinDisco) {
+                toast.warning(`${SIN_DISCO_MENSAJE} — PPU ${result.ppu}`, { duration: 10000 });
             }
+        }, 800); // Debounce
 
-            setIsCheckingPPU(true);
-            try {
-                const { data, error } = await supabase
-                    .from("bus_failures")
-                    .select("*")
-                    .eq("ppu", ppuValue.toUpperCase())
-                    .limit(1)
-                    .single();
-
-                if (error && error.code !== 'PGRST116') {
-                    console.error("Error checking bus:", error);
-                }
-
-                if (data) {
-                    setBusFailure(data);
-                    toast.warning(`Atención: La PPU ${ppuValue} registra ${data.failure_type || 'falla'}.`);
-                } else {
-                    setBusFailure(null);
-                }
-            } finally {
-                setIsCheckingPPU(false);
-            }
+        return () => {
+            cancelled = true;
+            clearTimeout(timeoutId);
         };
-
-        const timeoutId = setTimeout(checkPPU, 800); // Debounce
-        return () => clearTimeout(timeoutId);
     }, [ppuValue]);
 
+    const isFueraDeFlota = fleetCheck?.status === "fuera_de_flota";
+    const sinDisco = Boolean(fleetCheck?.sinDisco);
+
     const onSubmit = async (data: RequestFormData) => {
+        // Una PPU ajena no genera solicitud: no es un bus nuestro.
+        if (isFueraDeFlota) {
+            toast.error("La PPU no pertenece a nuestra flota. No es posible registrar la solicitud.");
+            return;
+        }
+
         setIsSubmitting(true);
         try {
-            // Determine failure type and status automatically
-            const failure_type = busFailure ? (busFailure.failure_type || 'bus_sin_disco') : null;
-            // If bus has failure, we might auto-close or flag it. User requirement: "queda marcada como bus sin disco"
+            const ppu = normalizePpu(data.ppu);
 
             const payload = {
                 ...data,
-                failure_type: failure_type,
-                status: 'pendiente', // Always pending initially, admin reviews it
+                ppu,
+                failure_type: sinDisco ? 'bus_sin_disco' : null,
+                fleet_status: fleetCheck?.status || 'desconocido',
+                sin_disco: sinDisco,
+                sin_disco_source: sinDisco ? (fleetCheck?.sinDiscoSource || 'flota') : null,
+                // Sin disco no hay nada que revisar: pasa directo a envío.
+                status: sinDisco ? 'pendiente_envio' : 'pendiente',
             };
 
             const { error } = await supabase.from("solicitudes").insert([payload]);
 
             if (error) throw error;
+
+            if (sinDisco) {
+                await registrarBusSinDisco(
+                    ppu,
+                    data.case_number,
+                    `Solicitud ${data.case_number}: el bus no cuenta con disco duro.`
+                );
+            }
 
             // Send Email Notification
             try {
@@ -134,10 +159,15 @@ export function SmartRequestForm() {
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">¡Solicitud Recibida!</h2>
                 <p className="text-slate-600 mb-6">
                     Hemos registrado tu solicitud correctamente.
-                    {busFailure && <span className="block mt-2 font-medium text-amber-600">Nota: Se ha registrado la alerta de bus sin disco.</span>}
+                    {sinDisco && (
+                        <span className="block mt-2 font-bold text-red-600">
+                            {SIN_DISCO_MENSAJE}: el bus no cuenta con disco duro, por lo que no
+                            habrá grabación disponible. Quedó registrado en la solicitud.
+                        </span>
+                    )}
                 </p>
                 <button
-                    onClick={() => { setShowForm(true); setValue("ppu", ""); setBusFailure(null); }}
+                    onClick={() => { setShowForm(true); setValue("ppu", ""); setFleetCheck(null); }}
                     className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition"
                 >
                     Nueva Solicitud
@@ -192,24 +222,15 @@ export function SmartRequestForm() {
                         </div>
                     </div>
 
-                    {/* BUS FAILURE ALERT */}
+                    {/* Resultado del cruce con el padrón de flota */}
                     <AnimatePresence>
-                        {busFailure && (
+                        {(fleetCheck || isCheckingPPU) && (
                             <motion.div
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: "auto", opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
-                                className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3"
                             >
-                                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <h4 className="font-bold text-amber-800">¡Advertencia: Bus Sin Disco!</h4>
-                                    <p className="text-sm text-amber-700 mt-1">
-                                        La PPU <strong>{ppuValue}</strong> tiene un reporte activo de: <strong>{busFailure.failure_type}</strong>.
-                                        <br />
-                                        Su solicitud será registrada pero probablemente rechazada por falta de grabaciones.
-                                    </p>
-                                </div>
+                                <PpuFleetAlert check={fleetCheck} isChecking={isCheckingPPU} />
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -275,10 +296,17 @@ export function SmartRequestForm() {
                         {errors.detail && <span className="text-red-500 text-xs">{errors.detail.message}</span>}
                     </div>
 
+                    {isFueraDeFlota && (
+                        <p className="flex items-center justify-center gap-2 text-sm font-semibold text-red-600">
+                            <AlertTriangle className="w-4 h-4" />
+                            Envío bloqueado: la PPU no pertenece a nuestra flota.
+                        </p>
+                    )}
+
                     <button
                         type="submit"
-                        disabled={isSubmitting}
-                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        disabled={isSubmitting || isFueraDeFlota}
+                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
                     >
                         {isSubmitting ? (
                             <>

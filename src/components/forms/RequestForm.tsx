@@ -1,6 +1,6 @@
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Save, AlertTriangle, CheckCircle } from "lucide-react";
+import { Loader2, Save, AlertTriangle, CheckCircle, Ban } from "lucide-react";
 import { requestSchema, type RequestFormValues } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import { supabase } from "@/lib/supabase";
 import { useState, useEffect, useCallback } from "react";
 import { DateTimeInput } from "@/components/ui/datetime-input";
 import { Controller } from "react-hook-form";
+import { checkPpu, normalizePpu, SIN_DISCO_MENSAJE, type FleetCheck } from "@/lib/fleet";
+import { PpuFleetAlert } from "@/components/fleet/PpuFleetAlert";
 
 interface RequestFormProps {
     initialValues?: Partial<RequestFormValues>;
@@ -19,11 +21,15 @@ interface RequestFormProps {
     isLoading?: boolean;
     title?: string;
     mode?: "create" | "edit";
+    /** Notifica al contenedor cada vez que cambia el cruce con el padrón. */
+    onFleetCheckChange?: (check: FleetCheck | null) => void;
 }
 
-export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create" }: RequestFormProps) {
+export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create", onFleetCheckChange }: RequestFormProps) {
     const [caseExists, setCaseExists] = useState<boolean | null>(null);
     const [checkingCase, setCheckingCase] = useState(false);
+    const [fleetCheck, setFleetCheck] = useState<FleetCheck | null>(null);
+    const [checkingPpu, setCheckingPpu] = useState(false);
 
     const form = useForm<RequestFormValues>({
         resolver: zodResolver(requestSchema),
@@ -47,6 +53,7 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
 
     const { register, handleSubmit, formState: { errors }, control } = form;
     const caseNumber = useWatch({ control, name: "case_number" });
+    const ppu = useWatch({ control, name: "ppu" });
 
     // Check if case number exists
     const checkCaseExists = useCallback(async (caseNum: string) => {
@@ -90,15 +97,104 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
         return () => clearTimeout(timer);
     }, [caseNumber, checkCaseExists]);
 
-    const handleFormSubmit = async (data: RequestFormValues) => {
-        console.log('[FORM] Submitting data:', data);
-        if (caseExists && mode === "create") {
-            console.log('[FORM] Blocked: case already exists');
+    // ------------------------------------------------------------------
+    // Cruce de la PPU contra el padrón de flota.
+    // Se ignoran las respuestas que llegan fuera de orden: con debounce corto
+    // una consulta lenta podía pisar el resultado de una PPU ya corregida.
+    // ------------------------------------------------------------------
+    useEffect(() => {
+        const normalized = normalizePpu(ppu);
+
+        if (normalized.length < 4) {
+            setCheckingPpu(false);
+            setFleetCheck(null);
             return;
         }
+
+        let cancelled = false;
+        setCheckingPpu(true);
+
+        const timer = setTimeout(async () => {
+            const result = await checkPpu(normalized);
+            if (cancelled) return;
+            setFleetCheck(result);
+            setCheckingPpu(false);
+        }, 400);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [ppu]);
+
+    // Avisar al contenedor (Ingresos/Registros) del resultado vigente.
+    useEffect(() => {
+        onFleetCheckChange?.(fleetCheck);
+    }, [fleetCheck, onFleetCheckChange]);
+
+    // Detección proveniente del padrón. Es la que bloquea campos: si el padrón
+    // dice que no hay disco, el operador no debe poder contradecirlo.
+    const sinDiscoPadron = fleetCheck?.status === "en_flota" && fleetCheck.sinDisco;
+
+    const failureType = useWatch({ control, name: "failure_type" });
+
+    // Un bus sin disco no puede tener video: la falla se fija sola para que el
+    // operador no tenga que recordarlo y para que el correo salga correcto.
+    useEffect(() => {
+        if (sinDiscoPadron && form.getValues("failure_type") !== "bus_sin_disco") {
+            form.setValue("failure_type", "bus_sin_disco");
+        }
+    }, [sinDiscoPadron, form]);
+
+    /**
+     * Valor que efectivamente se guarda.
+     *
+     * El padrón manda cuando pudo consultarse. Si no (sin conexión, padrón sin
+     * cargar), se conserva lo que ya estaba registrado: un hecho confirmado
+     * antes no puede borrarse sólo porque hoy la consulta falló. La marca
+     * manual del operador también cuenta, venga de donde venga.
+     */
+    const sinDiscoEfectivo = fleetCheck?.status === "en_flota"
+        ? (fleetCheck.sinDisco || failureType === "bus_sin_disco")
+        : (Boolean(initialValues?.sin_disco) || failureType === "bus_sin_disco");
+
+    const sinDiscoSourceEfectivo = sinDiscoPadron
+        ? (fleetCheck?.sinDiscoSource ?? "flota")
+        : sinDiscoEfectivo
+            ? (initialValues?.sin_disco_source || "manual")
+            : null;
+
+    const isFueraDeFlota = fleetCheck?.status === "fuera_de_flota";
+    const isDuplicado = caseExists === true && mode === "create";
+    const submitBloqueado = isFueraDeFlota || isDuplicado;
+
+    const handleFormSubmit = async (data: RequestFormValues) => {
+        if (isDuplicado) {
+            console.log('[FORM] Bloqueado: el caso ya existe');
+            return;
+        }
+
+        // Segunda barrera: aunque la interfaz deshabilita el botón, un submit
+        // por teclado o un cambio de PPU de último momento no debe colarse.
+        if (isFueraDeFlota) {
+            console.log('[FORM] Bloqueado: PPU fuera de flota');
+            return;
+        }
+
+        const payload: RequestFormValues = {
+            ...data,
+            ppu: normalizePpu(data.ppu),
+            // Un 'desconocido' de hoy no debe pisar un 'en_flota' ya verificado.
+            fleet_status: fleetCheck && fleetCheck.status !== 'desconocido'
+                ? fleetCheck.status
+                : (initialValues?.fleet_status ?? 'desconocido'),
+            sin_disco: sinDiscoEfectivo,
+            sin_disco_source: sinDiscoEfectivo ? sinDiscoSourceEfectivo : null,
+            failure_type: sinDiscoEfectivo ? 'bus_sin_disco' : data.failure_type,
+        };
+
         try {
-            await onSubmit(data);
-            console.log('[FORM] Submit successful');
+            await onSubmit(payload);
         } catch (error) {
             console.error('[FORM] Submit error:', error);
         }
@@ -169,13 +265,41 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
 
                 <div className="space-y-1.5">
                     <Label htmlFor="ppu" className="label-enterprise">PPU</Label>
-                    <Input
-                        id="ppu"
-                        placeholder="BXGH12"
-                        {...register("ppu")}
-                        className={cn(errors.ppu && "border-red-500")}
-                    />
+                    <div className="relative">
+                        <Input
+                            id="ppu"
+                            placeholder="BXGH12"
+                            {...register("ppu")}
+                            className={cn(
+                                "uppercase",
+                                errors.ppu && "border-red-500",
+                                isFueraDeFlota && "border-red-500 ring-1 ring-red-400 pr-10",
+                                sinDiscoPadron && "border-amber-500 ring-1 ring-amber-400 pr-10",
+                                fleetCheck?.status === "en_flota" && !fleetCheck.sinDisco && "border-emerald-500 pr-10"
+                            )}
+                        />
+                        {checkingPpu && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                            </div>
+                        )}
+                        {!checkingPpu && isFueraDeFlota && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <Ban className="h-4 w-4 text-red-500" />
+                            </div>
+                        )}
+                        {!checkingPpu && fleetCheck?.status === "en_flota" && !fleetCheck.sinDisco && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                            </div>
+                        )}
+                    </div>
                     {errors.ppu && <p className="text-xs text-red-500">{errors.ppu.message}</p>}
+                </div>
+
+                {/* Resultado del cruce con el padrón de flota */}
+                <div className="md:col-span-2">
+                    <PpuFleetAlert check={fleetCheck} isChecking={checkingPpu} />
                 </div>
 
                 <div className="space-y-2">
@@ -249,7 +373,17 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
 
                         <div className="space-y-2 md:col-span-2">
                             <Label htmlFor="video_url">URL del Video</Label>
-                            <Input id="video_url" placeholder="https://..." {...register("video_url")} />
+                            <Input
+                                id="video_url"
+                                placeholder={sinDiscoEfectivo ? "Sin disco duro: no hay video que adjuntar" : "https://..."}
+                                disabled={sinDiscoEfectivo}
+                                {...register("video_url")}
+                            />
+                            {sinDiscoEfectivo && (
+                                <p className="text-xs text-amber-700">
+                                    Campo deshabilitado: el bus no tiene disco duro, no existe grabación.
+                                </p>
+                            )}
                             {errors.video_url && <p className="text-xs text-red-500">{errors.video_url.message}</p>}
                         </div>
 
@@ -266,8 +400,9 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
                                     <button
                                         key={option.value}
                                         type="button"
+                                        disabled={sinDiscoPadron}
                                         onClick={() => form.setValue('failure_type', option.value as any)}
-                                        className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${form.watch('failure_type') === option.value
+                                        className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-60 ${form.watch('failure_type') === option.value
                                             ? option.color + ' ring-2 ring-offset-1 ring-blue-500'
                                             : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
                                             }`}
@@ -275,7 +410,7 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
                                         {option.label}
                                     </button>
                                 ))}
-                                {form.watch('failure_type') && (
+                                {failureType && !sinDiscoPadron && (
                                     <button
                                         type="button"
                                         onClick={() => form.setValue('failure_type', '' as any)}
@@ -285,6 +420,11 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
                                     </button>
                                 )}
                             </div>
+                            {sinDiscoPadron && (
+                                <p className="text-xs text-amber-700">
+                                    Fijado automáticamente en «Bus Sin Disco» según el padrón de flota.
+                                </p>
+                            )}
                         </div>
 
                         <div className="space-y-2 md:col-span-2">
@@ -300,13 +440,22 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
                 )}
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex flex-col items-end gap-2">
+                {isFueraDeFlota && (
+                    <p className="flex items-center gap-1.5 text-sm font-semibold text-red-600">
+                        <Ban className="h-4 w-4" />
+                        Registro bloqueado: la PPU no pertenece a nuestra flota.
+                    </p>
+                )}
+                {sinDiscoEfectivo && !isFueraDeFlota && (
+                    <p className="text-xs font-medium text-amber-700">
+                        Se guardará como «Bus sin disco». El correo dirá: «{SIN_DISCO_MENSAJE}».
+                    </p>
+                )}
                 <Button
                     type="submit"
-                    disabled={isLoading || (caseExists === true && mode === "create")}
-                    className={cn(
-                        caseExists === true && mode === "create" && "opacity-50 cursor-not-allowed"
-                    )}
+                    disabled={isLoading || submitBloqueado}
+                    className={cn(submitBloqueado && "opacity-50 cursor-not-allowed")}
                 >
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isLoading ? "Guardando..." : "Guardar Solicitud"}

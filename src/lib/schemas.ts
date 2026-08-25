@@ -14,6 +14,12 @@ export const requestSchema = z.object({
     operator_rut: z.string().optional(),
     failure_type: z.any().optional(),
     status: z.enum(['pendiente', 'en_revision', 'revisado', 'pendiente_envio', 'enviado']),
+
+    // Cruce contra el padrón de flota. Los completa el formulario a partir de
+    // la verificación de la PPU; no son campos que el usuario escriba.
+    fleet_status: z.enum(['en_flota', 'fuera_de_flota', 'desconocido']).optional(),
+    sin_disco: z.boolean().optional(),
+    sin_disco_source: z.enum(['flota', 'bus_failures', 'manual']).optional().nullable(),
 });
 
 export const FAILURE_TYPES = {

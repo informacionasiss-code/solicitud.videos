@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { esBusSinDisco } from "@/lib/email";
+import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
 import { DataTable } from "@/components/tables/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
@@ -83,13 +85,27 @@ export default function Registros() {
     const handleDownloadPendingPDF = async () => {
         try {
             // Fetch only pending items (status pendiente AND no video)
-            const { data: pendingData, error } = await supabase
+            // Los buses sin disco no están pendientes de extracción: no hay
+            // nada que extraer, así que no deben viajar en este listado.
+            const withFleet = await supabase
                 .from('solicitudes')
                 .select('ppu, case_number, incident_at')
                 .is('video_url', null)
+                .eq('sin_disco', false)
                 .order('ppu', { ascending: true });
 
-            if (error) throw error;
+            let pendingData = withFleet.data;
+
+            if (withFleet.error) {
+                console.warn('[REGISTROS] Filtro sin_disco no disponible, usando fallback:', withFleet.error);
+                const fallback = await supabase
+                    .from('solicitudes')
+                    .select('ppu, case_number, incident_at')
+                    .is('video_url', null)
+                    .order('ppu', { ascending: true });
+                if (fallback.error) throw fallback.error;
+                pendingData = fallback.data;
+            }
 
             if (!pendingData || pendingData.length === 0) {
                 toast.error('No hay patentes pendientes de extracción');
@@ -194,6 +210,16 @@ export default function Registros() {
             header: "Video",
             cell: ({ row }) => {
                 const url = row.getValue("video_url") as string;
+                if (esBusSinDisco(row.original)) {
+                    return (
+                        <span
+                            className="inline-flex items-center rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700"
+                            title={SIN_DISCO_MENSAJE}
+                        >
+                            Sin disco
+                        </span>
+                    );
+                }
                 if (!url) return <span className="text-slate-400 text-sm">Sin video</span>;
                 return (
                     <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium text-sm group">

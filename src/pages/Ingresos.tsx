@@ -7,11 +7,22 @@ import { parseEmlFile } from "@/lib/parser";
 import { RequestFormValues } from "@/lib/schemas";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import {
+    checkPpu,
+    normalizePpu,
+    registrarBusSinDisco,
+    SIN_DISCO_MENSAJE,
+    type FleetCheck,
+} from "@/lib/fleet";
+import { PpuFleetAlert } from "@/components/fleet/PpuFleetAlert";
 
 export default function Ingresos() {
     const [parsedData, setParsedData] = useState<Partial<RequestFormValues> | null>(null);
     const [loading, setLoading] = useState(false);
     const [fileUploaded, setFileUploaded] = useState(false);
+    // Cruce hecho en el momento de subir el .eml, para avisar de inmediato sin
+    // esperar a que el usuario mire el formulario.
+    const [uploadCheck, setUploadCheck] = useState<FleetCheck | null>(null);
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const file = acceptedFiles[0];
@@ -19,11 +30,25 @@ export default function Ingresos() {
             try {
                 setLoading(true);
                 const data = await parseEmlFile(file);
-                setParsedData({
-                    ...data,
-                });
+                const ppu = normalizePpu(data.ppu);
+                setParsedData({ ...data, ppu });
                 setFileUploaded(true);
-                toast.success("Archivo .eml procesado correctamente");
+
+                // Verificación inmediata contra el padrón: es el aviso que
+                // decide si el caso se tramita o se descarta.
+                const check = await checkPpu(ppu);
+                setUploadCheck(check);
+
+                if (check.status === "fuera_de_flota") {
+                    toast.error(
+                        `PPU ${check.ppu} FUERA DE FLOTA — no considerar. El registro está bloqueado.`,
+                        { duration: 12000 }
+                    );
+                } else if (check.sinDisco) {
+                    toast.warning(`${SIN_DISCO_MENSAJE} — PPU ${check.ppu}`, { duration: 12000 });
+                } else {
+                    toast.success("Archivo .eml procesado correctamente");
+                }
             } catch (error) {
                 console.error(error);
                 toast.error("Error al leer el archivo .eml");
@@ -40,6 +65,16 @@ export default function Ingresos() {
     });
 
     const handleSubmit = async (values: RequestFormValues) => {
+        // Barrera final del lado del contenedor: ninguna solicitud de un bus
+        // ajeno debe llegar a la base, sin importar por dónde entre.
+        if (values.fleet_status === 'fuera_de_flota') {
+            toast.error("PPU fuera de flota: la solicitud no se registra.");
+            return;
+        }
+
+        const ppu = normalizePpu(values.ppu);
+        const sinDisco = Boolean(values.sin_disco);
+
         try {
             setLoading(true);
             const { error } = await supabase.from('solicitudes').insert([
@@ -47,22 +82,41 @@ export default function Ingresos() {
                     case_number: values.case_number,
                     incident_at: values.incident_at ? new Date(values.incident_at).toISOString() : null,
                     ingress_at: values.ingress_at ? new Date(values.ingress_at).toISOString() : null,
-                    ppu: values.ppu,
+                    ppu,
                     incident_point: values.incident_point,
                     reason: values.reason,
                     detail: values.detail,
                     operator_name: values.operator_name || null,
                     operator_rut: values.operator_rut || null,
-                    status: 'pendiente'
+                    fleet_status: values.fleet_status || 'desconocido',
+                    sin_disco: sinDisco,
+                    sin_disco_source: sinDisco ? (values.sin_disco_source || 'flota') : null,
+                    failure_type: sinDisco ? 'bus_sin_disco' : (values.failure_type || null),
+                    // Sin disco no hay nada que revisar: el caso queda listo
+                    // para enviar la respuesta en lugar de esperar un video.
+                    status: sinDisco ? 'pendiente_envio' : 'pendiente'
                 }
             ]);
 
             if (error) throw error;
 
-            toast.success("✅ Solicitud creada exitosamente");
+            if (sinDisco) {
+                // Historial por bus, para que la falla quede trazada aunque
+                // después se edite la solicitud.
+                await registrarBusSinDisco(
+                    ppu,
+                    values.case_number,
+                    `Solicitud ${values.case_number}: el bus no cuenta con disco duro.`
+                );
+                toast.warning(`Solicitud registrada — ${SIN_DISCO_MENSAJE}`, { duration: 8000 });
+            } else {
+                toast.success("✅ Solicitud creada exitosamente");
+            }
+
             // Reset form for next entry instead of navigating away
             setParsedData(null);
             setFileUploaded(false);
+            setUploadCheck(null);
         } catch (error: any) {
             console.error(error);
             toast.error("Error al guardar: " + error.message);
@@ -91,7 +145,7 @@ export default function Ingresos() {
                                 <p className="text-xl font-bold text-emerald-700">¡Archivo Procesado!</p>
                                 <p className="text-sm text-emerald-600 mt-2 text-center max-w-[220px]">Los datos han sido extraídos correctamente. Revisa el formulario.</p>
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); setFileUploaded(false); setParsedData(null); }}
+                                    onClick={(e) => { e.stopPropagation(); setFileUploaded(false); setParsedData(null); setUploadCheck(null); }}
                                     className="mt-6 px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 transition-all"
                                 >
                                     Cargar otro archivo
@@ -125,6 +179,11 @@ export default function Ingresos() {
                             </>
                         )}
                     </div>
+
+                    {/* Veredicto del padrón para el correo recién subido */}
+                    {uploadCheck && (
+                        <PpuFleetAlert check={uploadCheck} isChecking={false} />
+                    )}
 
                     {/* Instructions Card */}
                     <div className="helper-card">

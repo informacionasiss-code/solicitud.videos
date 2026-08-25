@@ -10,6 +10,7 @@ import { RequestFormValues } from "@/lib/schemas"
 import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import { normalizePpu, registrarBusSinDisco, SIN_DISCO_MENSAJE } from "@/lib/fleet"
 
 interface RequestModalProps {
     isOpen: boolean
@@ -25,9 +26,26 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
         try {
             setLoading(true)
 
+            // Editar una solicitud no puede desviarla a un bus ajeno.
+            if (values.fleet_status === 'fuera_de_flota') {
+                toast.error("PPU fuera de flota: no se guardan los cambios.")
+                return
+            }
+
+            const sinDisco = Boolean(values.sin_disco)
+            const ppu = normalizePpu(values.ppu)
+            // Sin disco no hay video posible: se descarta cualquier URL previa
+            // para que el correo no ofrezca una descarga inexistente.
+            const videoUrl = sinDisco ? null : (values.video_url || null)
+
             // Auto-update status logic
             let newStatus = request.status;
-            if (values.video_url && values.video_url !== request.video_url) {
+            if (sinDisco) {
+                if (!['enviado', 'pendiente_envio'].includes(request.status)) {
+                    newStatus = 'pendiente_envio';
+                    toast.info("Bus sin disco: estado actualizado a Pendiente de Envío");
+                }
+            } else if (videoUrl && videoUrl !== request.video_url) {
                 if (['pendiente', 'en_revision'].includes(request.status)) {
                     newStatus = 'pendiente_envio';
                     toast.info("Estado actualizado a: Pendiente de Envío");
@@ -40,12 +58,20 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
                     case_number: values.case_number,
                     incident_at: values.incident_at ? new Date(values.incident_at).toISOString() : null,
                     ingress_at: values.ingress_at ? new Date(values.ingress_at).toISOString() : null,
-                    ppu: values.ppu,
+                    ppu,
                     incident_point: values.incident_point,
                     reason: values.reason,
                     detail: values.detail,
-                    video_url: values.video_url,
-                    video_url_uploaded_at: (values.video_url && values.video_url !== request.video_url) ? new Date().toISOString() : request.video_url_uploaded_at,
+                    video_url: videoUrl,
+                    video_url_uploaded_at: (videoUrl && videoUrl !== request.video_url) ? new Date().toISOString() : request.video_url_uploaded_at,
+                    // Estos campos existían en el formulario pero no se
+                    // guardaban; sin ellos la falla y las observaciones se
+                    // perdían al editar.
+                    failure_type: sinDisco ? 'bus_sin_disco' : (values.failure_type || null),
+                    obs: values.obs || null,
+                    fleet_status: values.fleet_status || request.fleet_status || 'desconocido',
+                    sin_disco: sinDisco,
+                    sin_disco_source: sinDisco ? (values.sin_disco_source || 'flota') : null,
                     updated_at: new Date().toISOString(),
                     status: newStatus
                 })
@@ -53,7 +79,16 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
 
             if (error) throw error
 
-            toast.success("Solicitud actualizada")
+            if (sinDisco) {
+                await registrarBusSinDisco(
+                    ppu,
+                    values.case_number,
+                    `Solicitud ${values.case_number}: el bus no cuenta con disco duro.`
+                )
+                toast.warning(`Solicitud actualizada — ${SIN_DISCO_MENSAJE}`, { duration: 8000 })
+            } else {
+                toast.success("Solicitud actualizada")
+            }
             onSuccess()
             onClose()
         } catch (error: any) {

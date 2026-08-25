@@ -1,3 +1,23 @@
+import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
+
+/** Campos de una solicitud que determinan el estado del disco duro. */
+interface SolicitudDiscoFields {
+    sin_disco?: boolean | null;
+    failure_type?: string | null;
+    case_number?: string | null;
+}
+
+/**
+ * ¿Esta solicitud corresponde a un bus sin disco duro?
+ *
+ * Se aceptan varias señales porque el dato llega por distintos caminos: el
+ * campo dedicado `sin_disco` (padrón de flota) y el `failure_type` que puede
+ * fijar el operador a mano. Cualquiera de los dos basta: omitir el aviso es
+ * mucho peor que mostrarlo de más.
+ */
+export const esBusSinDisco = (request: SolicitudDiscoFields | null | undefined): boolean =>
+    Boolean(request?.sin_disco) || request?.failure_type === "bus_sin_disco";
+
 export const EMAIL_CONFIG = {
     to: ["cristian.luraschi@transdev.cl"],
     cc: [
@@ -6,16 +26,37 @@ export const EMAIL_CONFIG = {
     ]
 };
 
-export const generateEmailSubject = (case_number: string) => {
-    return `Solicitud de Video - Caso ${case_number}`;
+export const generateEmailSubject = (case_number: string, sinDisco = false) => {
+    const base = `Solicitud de Video - Caso ${case_number}`;
+    // El aviso va en el asunto para que se lea sin abrir el correo.
+    return sinDisco ? `[${SIN_DISCO_MENSAJE}] ${base}` : base;
 };
+
+/** Asunto a partir de la solicitud completa, resolviendo el caso sin disco. */
+export const subjectForRequest = (request: SolicitudDiscoFields | null | undefined) =>
+    generateEmailSubject(request?.case_number || '', esBusSinDisco(request));
 
 export const generateEmailBody = (request: any) => {
     const incidentDate = request.incident_at ? new Date(request.incident_at).toLocaleString('es-CL') : 'N/A';
+    const sinDisco = esBusSinDisco(request);
+
+    // El aviso encabeza el cuerpo: es la conclusión del caso, no una nota al pie.
+    const encabezado = sinDisco
+        ? `*** ${SIN_DISCO_MENSAJE} ***
+
+El bus ${request.ppu || 'S/I'} no cuenta con disco duro instalado, por lo que no
+existe grabación disponible para este requerimiento.
+
+`
+        : '';
+
+    const cierreVideo = sinDisco
+        ? `Video URL: NO APLICA - ${SIN_DISCO_MENSAJE}`
+        : `Video URL: ${request.video_url || 'PENDIENTE'}`;
 
     return `Estimados,
 
-Junto con saludar, envío antecedentes para extracción de video:
+${encabezado}Junto con saludar, envío antecedentes para extracción de video:
 
 Caso: ${request.case_number}
 PPU: ${request.ppu}
@@ -27,7 +68,9 @@ Motivo: ${request.reason || 'N/A'}
 Detalle:
 ${request.detail || 'N/A'}
 
-Video URL: ${request.video_url || 'PENDIENTE'}
+${cierreVideo}${request.obs ? `
+
+Observaciones: ${request.obs}` : ''}
 
 Saludos cordiales.
 `;
@@ -35,6 +78,8 @@ Saludos cordiales.
 
 // Generate HTML version for Resend - Enterprise Safe Design (Premium & Deliverable)
 export const generateEmailHtml = (request: any) => {
+    const sinDisco = esBusSinDisco(request);
+
     // Safe Date Parsing
     let incidentDate = 'N/A';
     try {
@@ -49,6 +94,17 @@ export const generateEmailHtml = (request: any) => {
     // Badge Logic (Table-based for compatibility)
     const getStatusContent = () => {
         try {
+            if (sinDisco) {
+                return `
+                <table border="0" cellspacing="0" cellpadding="0">
+                    <tr>
+                        <td style="background-color: #7f1d1d; color: #ffffff; border: 1px solid #7f1d1d; padding: 6px 12px; border-radius: 16px; font-size: 11px; font-weight: bold; text-transform: uppercase; font-family: Helvetica, Arial, sans-serif;">
+                            Sin Disco Duro
+                        </td>
+                    </tr>
+                </table>`;
+            }
+
             if (request.video_url) {
                 return `
                 <table border="0" cellspacing="0" cellpadding="0">
@@ -111,6 +167,20 @@ export const generateEmailHtml = (request: any) => {
                         </td>
                     </tr>
 
+                    ${sinDisco ? `
+                    <!-- Aviso principal: el bus no tiene disco duro -->
+                    <tr>
+                        <td style="background-color: #b91c1c; padding: 24px 40px; text-align: center;">
+                            <p style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: 1px; line-height: 1.3; font-family: Helvetica, Arial, sans-serif;">
+                                ${SIN_DISCO_MENSAJE}
+                            </p>
+                            <p style="margin: 10px 0 0 0; color: #fecaca; font-size: 13px; line-height: 1.5; font-family: Helvetica, Arial, sans-serif;">
+                                El bus <strong style="color: #ffffff;">${request.ppu || 'S/I'}</strong> no cuenta con disco duro instalado.<br />
+                                No existe grabación disponible para este requerimiento.
+                            </p>
+                        </td>
+                    </tr>` : ''}
+
                     <!-- Intro Section -->
                     <tr>
                         <td style="padding: 32px 40px 20px 40px; background-color: #ffffff;">
@@ -127,7 +197,9 @@ export const generateEmailHtml = (request: any) => {
                             </table>
                             
                             <p style="margin-top: 24px; color: #374151; font-size: 15px; line-height: 1.6;">
-                                Estimados, se adjuntan los antecedentes actualizados de la solicitud de video.
+                                ${sinDisco
+            ? 'Estimados, se informa que el bus asociado a este caso no cuenta con disco duro, por lo que no es posible obtener la grabación solicitada. Se adjuntan los antecedentes para su registro.'
+            : 'Estimados, se adjuntan los antecedentes actualizados de la solicitud de video.'}
                             </p>
                         </td>
                     </tr>
@@ -146,7 +218,7 @@ export const generateEmailHtml = (request: any) => {
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f9fafb; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; color: #4b5563; font-size: 12px; font-weight: 700; text-transform: uppercase;">Patente (PPU)</td>
-                                    <td style="background-color: #ffffff; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #1e40af; font-size: 15px; font-weight: 700;">${request.ppu || '—'}</td>
+                                    <td style="background-color: #ffffff; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #1e40af; font-size: 15px; font-weight: 700;">${request.ppu || '—'}${sinDisco ? ` <span style="color: #b91c1c; font-size: 12px; font-weight: 700;">&nbsp;·&nbsp;SIN DISCO DURO</span>` : ''}</td>
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f9fafb; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; color: #4b5563; font-size: 12px; font-weight: 700; text-transform: uppercase;">Ubicación</td>
@@ -196,9 +268,12 @@ export const generateEmailHtml = (request: any) => {
                              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;">
                                 <tr>
                                     <td style="padding: 20px; text-align: center;">
-                                        <p style="margin: 0 0 4px 0; color: #991b1b; font-size: 15px; font-weight: 700;">Evidencia No Disponible</p>
+                                        <p style="margin: 0 0 4px 0; color: #991b1b; font-size: 15px; font-weight: 700;">${sinDisco ? SIN_DISCO_MENSAJE : 'Evidencia No Disponible'}</p>
                                         <p style="margin: 0; color: #b91c1c; font-size: 13px;">
                                              ${(() => {
+                if (sinDisco) {
+                    return `El bus no cuenta con disco duro instalado, por lo que no hay grabación que revisar.${request.obs ? `<br>Observación: ${request.obs}` : ''}`;
+                }
                 const failureLabel = request.failure_type
                     ? (request.failure_type === 'disco_danado' ? 'Disco Dañado' :
                         request.failure_type === 'bus_sin_disco' ? 'Bus Sin Disco' :
@@ -242,7 +317,7 @@ export const generateEmailHtml = (request: any) => {
 };
 
 export const getMailtoUrl = (request: any) => {
-    const subject = encodeURIComponent(generateEmailSubject(request?.case_number || ''));
+    const subject = encodeURIComponent(subjectForRequest(request));
     const rawBody = generateEmailBody(request || {});
     const bodyCRLF = rawBody.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
     const body = encodeURIComponent(bodyCRLF);
@@ -253,7 +328,7 @@ export const getMailtoUrl = (request: any) => {
 
 // Generates full email text for clipboard copy
 export const generateFullEmailText = (request: any) => {
-    const subject = generateEmailSubject(request?.case_number || '');
+    const subject = subjectForRequest(request);
     const body = generateEmailBody(request || {});
     const to = EMAIL_CONFIG.to.join('; ');
     const cc = EMAIL_CONFIG.cc.join('; ');
@@ -362,7 +437,7 @@ export const sendEmailViaResend = async (
         const supabaseUrl = getSupabaseUrl();
         const supabaseKey = getSupabaseAnonKey();
 
-        const subject = generateEmailSubject(request.case_number);
+        const subject = subjectForRequest(request);
         const html = generateEmailHtml(request);
         const text = generateEmailBody(request);
 

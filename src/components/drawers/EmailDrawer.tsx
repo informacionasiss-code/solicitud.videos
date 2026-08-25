@@ -1,7 +1,8 @@
 import { X, Mail, Copy, CheckCircle, FileText, Clipboard, Loader2, Send, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { generateEmailBody, generateEmailSubject, EMAIL_CONFIG, sendEmailViaResend } from "@/lib/email";
+import { generateEmailBody, subjectForRequest, esBusSinDisco, EMAIL_CONFIG, sendEmailViaResend } from "@/lib/email";
+import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
 import { toast } from "sonner";
 import { useCallback, useState, useEffect } from "react";
 
@@ -65,7 +66,7 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
         if (!request) return;
 
         try {
-            const subject = generateEmailSubject(request?.case_number || '');
+            const subject = subjectForRequest(request);
             const body = generateEmailBody(request || {});
             const to = toEmails.join('; ');
             const cc = ccEmails.join('; ');
@@ -157,6 +158,19 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+
+                    {/* Aviso de bus sin disco: se ve antes de pulsar enviar */}
+                    {esBusSinDisco(request) && (
+                        <div className="rounded-lg border-2 border-red-500 bg-red-50 p-4">
+                            <p className="text-sm font-extrabold uppercase tracking-wide text-red-700">
+                                {SIN_DISCO_MENSAJE}
+                            </p>
+                            <p className="mt-1 text-xs text-red-700">
+                                Este bus no cuenta con disco duro. El correo se enviará informando
+                                que no existe grabación disponible, con el aviso en el asunto.
+                            </p>
+                        </div>
+                    )}
 
                     {/* Case Info */}
                     <div className="flex items-center gap-4 p-4 bg-white rounded-lg border shadow-sm">
@@ -301,13 +315,13 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
                                 variant="ghost"
                                 size="sm"
                                 className="h-6 text-xs text-blue-600"
-                                onClick={() => request && handleCopy(generateEmailSubject(request.case_number), 'Asunto')}
+                                onClick={() => request && handleCopy(subjectForRequest(request), 'Asunto')}
                             >
                                 <Copy className="h-3 w-3 mr-1" /> Copiar
                             </Button>
                         </div>
                         <p className="text-sm font-medium text-slate-900">
-                            {request && generateEmailSubject(request.case_number)}
+                            {request && subjectForRequest(request)}
                         </p>
                     </div>
 
