@@ -62,8 +62,15 @@ export function PpuFleetAlert({ check, isChecking, hideSuccess }: PpuFleetAlertP
         );
     }
 
-    // --- Es nuestro pero no tiene disco duro -------------------------------
-    if (check.status === "en_flota" && check.sinDisco) {
+    // --- No tiene disco duro -----------------------------------------------
+    // Se muestra también cuando la flota no pudo verificarse: el dato del disco
+    // vale por sí mismo y no debe perderse porque el padrón no esté disponible.
+    // (El caso "fuera de flota" ya retornó arriba.)
+    if (check.sinDisco) {
+        const origen =
+            check.sinDiscoSource === "flota"
+                ? "el padrón de flota"
+                : "un reporte previo de bus sin disco";
         return (
             <div
                 role="alert"
@@ -79,9 +86,9 @@ export function PpuFleetAlert({ check, isChecking, hideSuccess }: PpuFleetAlertP
                         </h4>
                         <p className="mt-1 text-sm text-amber-800">
                             El bus <strong className="font-mono">{check.ppu}</strong>
-                            {check.bus?.interno ? ` (interno ${check.bus.interno})` : ""} es de
-                            nuestra flota, pero <strong>no cuenta con disco duro</strong> según el
-                            padrón. No hay grabación posible para este caso.
+                            {check.bus?.interno ? ` (interno ${check.bus.interno})` : ""}{" "}
+                            <strong>no cuenta con disco duro</strong> según {origen}. No hay
+                            grabación posible para este caso.
                         </p>
                         <p className="mt-2 rounded-md bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900">
                             Al guardar se enviará el correo de inmediato con el aviso

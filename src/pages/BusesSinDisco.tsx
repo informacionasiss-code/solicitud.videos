@@ -3,6 +3,8 @@ import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bus, HardDrive, Search, AlertTriangle, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { invalidateFleetCache, normalizePpu, SIN_DISCO_MENSAJE, type FlotaRow } from "@/lib/fleet";
 
 // ============================================================================
@@ -33,6 +35,29 @@ export default function BusesSinDisco() {
         },
     });
 
+    // Reportes antiguos de `bus_failures`. Siguen alertando aunque el padrón no
+    // los refleje todavía, así que tienen que verse aquí: si no, la pantalla
+    // mostraría menos buses de los que el sistema realmente considera sin disco.
+    const { data: reportes } = useQuery({
+        queryKey: ["reportes_sin_disco"],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from("bus_failures")
+                .select("ppu, notes, created_at")
+                .eq("failure_type", "bus_sin_disco")
+                .order("created_at", { ascending: false });
+            if (error) throw error;
+
+            // Un mismo bus puede tener varios reportes: interesa el bus, no
+            // cada evento.
+            const vistos = new Map<string, { ppu: string; notes: string | null; created_at: string }>();
+            for (const r of data || []) {
+                if (!vistos.has(r.ppu)) vistos.set(r.ppu, r);
+            }
+            return Array.from(vistos.values());
+        },
+    });
+
     const { data: totalFlota } = useQuery({
         queryKey: ["padron_total"],
         queryFn: async () => {
@@ -48,6 +73,7 @@ export default function BusesSinDisco() {
         invalidateFleetCache();
         queryClient.invalidateQueries({ queryKey: ["padron_sin_disco"] });
         queryClient.invalidateQueries({ queryKey: ["padron_total"] });
+        queryClient.invalidateQueries({ queryKey: ["reportes_sin_disco"] });
     };
 
     // Marcar o desmarcar es una actualización del bus, nunca una fila nueva.
@@ -80,6 +106,10 @@ export default function BusesSinDisco() {
         },
         onError: (err: Error) => toast.error(err.message),
     });
+
+    // Reportes que aún no están reflejados en el padrón.
+    const enPadron = new Set((buses || []).map((b) => b.ppu));
+    const soloReporte = (reportes || []).filter((r) => !enPadron.has(normalizePpu(r.ppu)));
 
     const filtrados = buses?.filter((b) => {
         const q = searchTerm.toLowerCase();
@@ -115,7 +145,14 @@ export default function BusesSinDisco() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="rounded-xl border border-red-200 bg-red-50 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-red-600">Sin disco</p>
-                    <p className="mt-1 text-3xl font-bold text-red-700">{buses?.length ?? "—"}</p>
+                    <p className="mt-1 text-3xl font-bold text-red-700">
+                        {buses ? buses.length + soloReporte.length : "—"}
+                    </p>
+                    {soloReporte.length > 0 && (
+                        <p className="mt-0.5 text-xs text-red-600">
+                            {buses?.length ?? 0} en padrón + {soloReporte.length} por reporte
+                        </p>
+                    )}
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total en padrón</p>
@@ -180,6 +217,47 @@ export default function BusesSinDisco() {
                     </button>
                 </div>
             </div>
+
+            {/* Reportes previos que el padrón todavía no refleja */}
+            {soloReporte.length > 0 && (
+                <div className="overflow-hidden rounded-xl border border-amber-300 bg-amber-50 shadow-sm">
+                    <div className="border-b border-amber-200 p-4">
+                        <h3 className="font-semibold text-amber-900">
+                            Reportes previos sin reflejar en el padrón ({soloReporte.length})
+                        </h3>
+                        <p className="mt-1 text-xs text-amber-800">
+                            Estos buses fueron marcados sin disco antes de existir el padrón. Ya
+                            generan alerta, pero conviene registrarlos en la ficha del bus para que
+                            el padrón sea la referencia única. «Pasar al padrón» actualiza el bus si
+                            está en la flota.
+                        </p>
+                    </div>
+                    <table className="w-full text-left text-sm">
+                        <tbody className="divide-y divide-amber-200">
+                            {soloReporte.map((r) => (
+                                <tr key={r.ppu}>
+                                    <td className="px-6 py-2 font-mono font-medium text-amber-900">{r.ppu}</td>
+                                    <td className="px-6 py-2 text-xs text-amber-700">
+                                        {r.notes || "Reporte de bus sin disco"}
+                                    </td>
+                                    <td className="px-6 py-2 text-xs text-amber-600">
+                                        {format(new Date(r.created_at), "dd MMM yyyy", { locale: es })}
+                                    </td>
+                                    <td className="px-6 py-2 text-right">
+                                        <button
+                                            onClick={() => marcarMutation.mutate({ ppu: r.ppu, tieneDisco: false })}
+                                            disabled={marcarMutation.isPending}
+                                            className="rounded px-3 py-1.5 text-xs font-medium text-amber-800 underline hover:bg-amber-100 disabled:opacity-50"
+                                        >
+                                            Pasar al padrón
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {/* Listado */}
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

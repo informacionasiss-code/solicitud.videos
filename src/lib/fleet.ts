@@ -28,7 +28,7 @@ export type FleetUnknownReason =
     | "padron_vacio"
     | "error_consulta";
 
-export type SinDiscoSource = "flota" | "manual";
+export type SinDiscoSource = "flota" | "bus_failures" | "manual";
 
 export interface FlotaRow {
     id: string;
@@ -81,14 +81,31 @@ export function isPpuLookupable(raw?: string | null): boolean {
     return normalizePpu(raw).length >= MIN_PPU_LENGTH;
 }
 
-function emptyCheck(ppu: string, unknownReason: FleetUnknownReason): FleetCheck {
+/** ¿Hay un reporte previo que diga que este bus no tiene disco? */
+function reportaSinDisco(failure: BusFailureRow | null): boolean {
+    return failure?.failure_type === "bus_sin_disco";
+}
+
+/**
+ * Resultado sin veredicto de flota.
+ *
+ * Aun sin poder verificar la flota, un reporte previo de "bus sin disco" sigue
+ * siendo información válida y debe alertar: no saber si el bus es nuestro no
+ * borra lo que ya sabíamos de su disco.
+ */
+function emptyCheck(
+    ppu: string,
+    unknownReason: FleetUnknownReason,
+    failure: BusFailureRow | null = null
+): FleetCheck {
+    const sinDisco = reportaSinDisco(failure);
     return {
         ppu,
         status: "desconocido",
-        sinDisco: false,
-        sinDiscoSource: null,
+        sinDisco,
+        sinDiscoSource: sinDisco ? "bus_failures" : null,
         bus: null,
-        failure: null,
+        failure,
         unknownReason,
     };
 }
@@ -177,24 +194,24 @@ export async function checkPpu(rawPpu?: string | null): Promise<FleetCheck> {
 
         if (flotaRes.error) {
             if (isMissingTableError(flotaRes.error)) {
-                return { ...emptyCheck(ppu, "padron_no_existe"), failure };
+                return emptyCheck(ppu, "padron_no_existe", failure);
             }
             console.error("[FLOTA] Error consultando flota:", flotaRes.error);
-            return { ...emptyCheck(ppu, "error_consulta"), failure };
+            return emptyCheck(ppu, "error_consulta", failure);
         }
 
         const bus = (flotaRes.data as FlotaRow | null) || null;
 
         if (!bus) {
-            if (padron.missing) return { ...emptyCheck(ppu, "padron_no_existe"), failure };
+            if (padron.missing) return emptyCheck(ppu, "padron_no_existe", failure);
             // Padrón sin filas: la ausencia de la PPU no prueba nada todavía.
-            if (!padron.loaded) return { ...emptyCheck(ppu, "padron_vacio"), failure };
+            if (!padron.loaded) return emptyCheck(ppu, "padron_vacio", failure);
 
             return {
                 ppu,
                 status: "fuera_de_flota",
-                sinDisco: false,
-                sinDiscoSource: null,
+                sinDisco: reportaSinDisco(failure),
+                sinDiscoSource: reportaSinDisco(failure) ? "bus_failures" : null,
                 bus: null,
                 failure,
                 unknownReason: null,
@@ -203,12 +220,20 @@ export async function checkPpu(rawPpu?: string | null): Promise<FleetCheck> {
 
         // El bus es nuestro: recién ahora importa el disco duro.
         //
-        // El padrón es la ÚNICA fuente de verdad. Antes se consultaba también
-        // `bus_failures`, pero esa tabla es un historial de incidencias, no un
-        // inventario: usarla para decidir mezclaba "este bus tuvo una falla una
-        // vez" con "este bus no tiene disco instalado".
-        const sinDisco = bus.tiene_disco === false;
-        const sinDiscoSource: SinDiscoSource | null = sinDisco ? "flota" : null;
+        // El padrón manda cuando afirma que no hay disco. Si dice que sí lo
+        // hay, un reporte previo de "bus sin disco" todavía alerta: la ficha
+        // puede estar desactualizada, y dejar de avisar es mucho peor que
+        // avisar de más. Se marca el origen para saber de dónde vino el dato.
+        let sinDisco = false;
+        let sinDiscoSource: SinDiscoSource | null = null;
+
+        if (bus.tiene_disco === false) {
+            sinDisco = true;
+            sinDiscoSource = "flota";
+        } else if (reportaSinDisco(failure)) {
+            sinDisco = true;
+            sinDiscoSource = "bus_failures";
+        }
 
         return {
             ppu,
