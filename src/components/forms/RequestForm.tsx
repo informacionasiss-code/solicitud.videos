@@ -1,7 +1,7 @@
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Save, AlertTriangle, CheckCircle, Ban } from "lucide-react";
-import { requestSchema, vacioANulo, type RequestFormValues } from "@/lib/schemas";
+import { requestSchema, vacioANulo, esFallaRegistrada, etiquetaFalla, type RequestFormValues } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -190,6 +190,25 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
         : sinDiscoEfectivo
             ? (vacioANulo(initialValues?.sin_disco_source) || "manual")
             : null;
+
+    /**
+     * Hay un motivo registrado por el que no habrá video.
+     *
+     * Vale para los cinco tipos de falla, no sólo para la falta de disco: si el
+     * video está sobreescrito o el disco dañado, pedir una URL es pedir algo
+     * que no existe. Con una falla marcada, el caso ya está resuelto y pasa a
+     * la cola de envío.
+     */
+    const hayFalla = esFallaRegistrada(failureType) || sinDiscoEfectivo;
+    const etiquetaDeFalla = sinDiscoEfectivo ? "Bus Sin Disco" : etiquetaFalla(failureType);
+
+    // Al registrar una falla se descarta la URL: no puede quedar un enlace de
+    // una revisión anterior en un caso que se cierra sin grabación.
+    useEffect(() => {
+        if (hayFalla && form.getValues("video_url")) {
+            form.setValue("video_url", "");
+        }
+    }, [hayFalla, form]);
 
     const isFueraDeFlota = fleetCheck?.status === "fuera_de_flota";
     const isDuplicado = caseExists === true && mode === "create";
@@ -402,13 +421,17 @@ export function RequestForm({ initialValues, onSubmit, isLoading, mode = "create
                             <Label htmlFor="video_url">URL del Video</Label>
                             <Input
                                 id="video_url"
-                                placeholder={sinDiscoEfectivo ? "Sin disco duro: no hay video que adjuntar" : "https://..."}
-                                disabled={sinDiscoEfectivo}
+                                placeholder={hayFalla
+                                    ? `${etiquetaDeFalla}: no hay video que adjuntar`
+                                    : "https://..."}
+                                disabled={hayFalla}
                                 {...register("video_url")}
                             />
-                            {sinDiscoEfectivo && (
+                            {hayFalla && (
                                 <p className="text-xs text-amber-700">
-                                    Campo deshabilitado: el bus no tiene disco duro, no existe grabación.
+                                    Campo deshabilitado: hay una falla registrada
+                                    {etiquetaDeFalla ? ` («${etiquetaDeFalla}»)` : ""}, no existe grabación
+                                    que adjuntar.
                                 </p>
                             )}
                             {errors.video_url && <p className="text-xs text-red-500">{errors.video_url.message}</p>}

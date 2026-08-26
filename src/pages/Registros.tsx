@@ -86,11 +86,16 @@ export default function Registros() {
         try {
             // --- Solicitudes de video pendientes de extracción ---
             // Un bus sin disco no está pendiente: no hay nada que extraer.
+            // Además de los buses sin disco, se excluyen las solicitudes con
+            // cualquier falla registrada: un video sobreescrito o un disco
+            // dañado tampoco se pueden extraer, y mandar al inspector a ese bus
+            // es exactamente el tiempo perdido que este listado debe evitar.
             const consultaSolicitudes = await supabase
                 .from('solicitudes')
                 .select('ppu, case_number, incident_at, sin_disco')
                 .is('video_url', null)
                 .eq('sin_disco', false)
+                .is('failure_type', null)
                 .order('ppu', { ascending: true });
 
             // El fallback no puede pedir `sin_disco` -es justo la columna que
@@ -105,6 +110,7 @@ export default function Registros() {
                     .from('solicitudes')
                     .select('ppu, case_number, incident_at')
                     .is('video_url', null)
+                    .is('failure_type', null)
                     .order('ppu', { ascending: true });
                 if (fallback.error) throw fallback.error;
                 solicitudes = fallback.data || [];

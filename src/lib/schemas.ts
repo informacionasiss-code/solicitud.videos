@@ -66,6 +66,23 @@ export const FAILURE_TYPES = {
     no_disponible: "No Disponible"
 } as const;
 
+export type FailureType = keyof typeof FAILURE_TYPES;
+
+/**
+ * ¿La solicitud tiene registrado un motivo por el que no hay video?
+ *
+ * Cualquiera de los tipos de falla significa lo mismo desde el punto de vista
+ * del trámite: no va a haber grabación. Da igual que el disco esté dañado, que
+ * el video se haya sobreescrito o que el bus no tenga disco; en los tres casos
+ * pedir una URL es pedir algo que no existe, y el caso ya se puede responder.
+ */
+export const esFallaRegistrada = (tipo: unknown): tipo is FailureType =>
+    typeof tipo === "string" && tipo !== "" && tipo in FAILURE_TYPES;
+
+/** Nombre legible del tipo de falla, o null si no hay ninguno. */
+export const etiquetaFalla = (tipo: unknown): string | null =>
+    esFallaRegistrada(tipo) ? FAILURE_TYPES[tipo] : null;
+
 export type RequestFormValues = z.infer<typeof requestSchema>;
 
 export const STATUS_LABELS = {

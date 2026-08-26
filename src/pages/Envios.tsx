@@ -8,7 +8,7 @@ import { Send, CheckCircle, Mail, Sparkles, HardDrive } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { EmailDrawer } from "@/components/drawers/EmailDrawer";
-import { esBusSinDisco } from "@/lib/email";
+import { esBusSinDisco, tieneFallaRegistrada, motivoSinVideo } from "@/lib/email";
 import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
 
 export default function Envios() {
@@ -17,13 +17,14 @@ export default function Envios() {
     const { data, refetch } = useQuery({
         queryKey: ['solicitudes-envios'],
         queryFn: async () => {
-            // Pendientes de envío: los que ya tienen video, y también los buses
-            // sin disco duro — esos nunca tendrán video y aun así hay que
-            // responder el caso informando que no hay grabación.
+            // Pendientes de envío: los que ya tienen video, y también todos los
+            // que tienen una falla registrada. Antes sólo entraban los buses
+            // sin disco, de modo que un caso cerrado por video sobreescrito o
+            // disco dañado no aparecía en ninguna parte y no se podía responder.
             const { data, error } = await supabase
                 .from('solicitudes')
                 .select('*')
-                .or('video_url.not.is.null,sin_disco.is.true')
+                .or('video_url.not.is.null,sin_disco.is.true,failure_type.not.is.null')
                 .neq('status', 'enviado')
                 .order('updated_at', { ascending: false });
 
@@ -95,6 +96,13 @@ export default function Envios() {
                         </Badge>
                     );
                 }
+                if (tieneFallaRegistrada(row.original)) {
+                    return (
+                        <Badge className="bg-amber-100 text-amber-800 border-amber-300 border font-semibold">
+                            {motivoSinVideo(row.original)}
+                        </Badge>
+                    );
+                }
                 return url ? (
                     <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 border font-medium">
                         <CheckCircle className="h-3 w-3 mr-1" />
@@ -154,7 +162,7 @@ export default function Envios() {
                         <Sparkles className="h-8 w-8 text-slate-500" />
                     </div>
                     <h3 className="text-lg font-semibold text-slate-900">No hay envíos pendientes</h3>
-                    <p className="text-sm text-slate-500 mt-1">Aquí aparecen las solicitudes con video listo y los buses sin disco duro, que se responden sin grabación.</p>
+                    <p className="text-sm text-slate-500 mt-1">Aquí aparecen las solicitudes con video listo y las cerradas por una falla —sin disco, sobreescrito, disco dañado—, que se responden sin grabación.</p>
                 </div>
             )}
 

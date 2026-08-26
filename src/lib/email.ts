@@ -1,4 +1,5 @@
 import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
+import { esFallaRegistrada, etiquetaFalla } from "@/lib/schemas";
 
 /** Campos de una solicitud que determinan el estado del disco duro. */
 interface SolicitudDiscoFields {
@@ -17,6 +18,23 @@ interface SolicitudDiscoFields {
  */
 export const esBusSinDisco = (request: SolicitudDiscoFields | null | undefined): boolean =>
     Boolean(request?.sin_disco) || request?.failure_type === "bus_sin_disco";
+
+/**
+ * ¿Hay un motivo registrado por el que este caso no tendrá video?
+ *
+ * Cubre los cinco tipos de falla, no sólo la falta de disco. Un video
+ * sobreescrito o un disco dañado dejan el caso igual de cerrado: no hay nada
+ * que esperar y el correo debe explicar por qué en lugar de anunciar un enlace
+ * pendiente que nunca va a llegar.
+ */
+export const tieneFallaRegistrada = (request: SolicitudDiscoFields | null | undefined): boolean =>
+    esBusSinDisco(request) || esFallaRegistrada(request?.failure_type);
+
+/** Texto del motivo, para el asunto y el cuerpo del correo. */
+export const motivoSinVideo = (request: SolicitudDiscoFields | null | undefined): string | null => {
+    if (esBusSinDisco(request)) return SIN_DISCO_MENSAJE;
+    return etiquetaFalla(request?.failure_type);
+};
 
 export const EMAIL_CONFIG = {
     to: ["cristian.luraschi@transdev.cl"],
@@ -39,6 +57,10 @@ export const subjectForRequest = (request: SolicitudDiscoFields | null | undefin
 export const generateEmailBody = (request: any) => {
     const incidentDate = request.incident_at ? new Date(request.incident_at).toLocaleString('es-CL') : 'N/A';
     const sinDisco = esBusSinDisco(request);
+    // Con una falla registrada no se anuncia un enlace pendiente: se dice el
+    // motivo. Prometer un video que no va a llegar obliga al destinatario a
+    // volver a preguntar.
+    const motivo = motivoSinVideo(request);
 
     // El aviso encabeza el cuerpo: es la conclusión del caso, no una nota al pie.
     const encabezado = sinDisco
@@ -48,10 +70,16 @@ El bus ${request.ppu || 'S/I'} no cuenta con disco duro instalado, por lo que no
 existe grabación disponible para este requerimiento.
 
 `
-        : '';
+        : motivo
+            ? `*** SIN GRABACION DISPONIBLE: ${motivo.toUpperCase()} ***
 
-    const cierreVideo = sinDisco
-        ? `Video URL: NO APLICA - ${SIN_DISCO_MENSAJE}`
+No es posible obtener la grabación solicitada para el bus ${request.ppu || 'S/I'}.
+
+`
+            : '';
+
+    const cierreVideo = motivo
+        ? `Video URL: NO APLICA - ${motivo.toUpperCase()}`
         : `Video URL: ${request.video_url || 'PENDIENTE'}`;
 
     return `Estimados,
@@ -79,6 +107,7 @@ Saludos cordiales.
 // Generate HTML version for Resend - Enterprise Safe Design (Premium & Deliverable)
 export const generateEmailHtml = (request: any) => {
     const sinDisco = esBusSinDisco(request);
+    const motivo = motivoSinVideo(request);
 
     // Safe Date Parsing
     let incidentDate = 'N/A';
@@ -105,7 +134,7 @@ export const generateEmailHtml = (request: any) => {
                 </table>`;
             }
 
-            if (request.video_url) {
+            if (request.video_url && !motivo) {
                 return `
                 <table border="0" cellspacing="0" cellpadding="0">
                     <tr>
@@ -167,16 +196,17 @@ export const generateEmailHtml = (request: any) => {
                         </td>
                     </tr>
 
-                    ${sinDisco ? `
-                    <!-- Aviso principal: el bus no tiene disco duro -->
+                    ${motivo ? `
+                    <!-- Aviso principal: no habrá grabación, y por qué -->
                     <tr>
                         <td style="background-color: #b91c1c; padding: 24px 40px; text-align: center;">
                             <p style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: 1px; line-height: 1.3; font-family: Helvetica, Arial, sans-serif;">
-                                ${SIN_DISCO_MENSAJE}
+                                ${sinDisco ? SIN_DISCO_MENSAJE : `SIN GRABACIÓN DISPONIBLE`}
                             </p>
                             <p style="margin: 10px 0 0 0; color: #fecaca; font-size: 13px; line-height: 1.5; font-family: Helvetica, Arial, sans-serif;">
-                                El bus <strong style="color: #ffffff;">${request.ppu || 'S/I'}</strong> no cuenta con disco duro instalado.<br />
-                                No existe grabación disponible para este requerimiento.
+                                ${sinDisco
+                ? `El bus <strong style="color: #ffffff;">${request.ppu || 'S/I'}</strong> no cuenta con disco duro instalado.<br />No existe grabación disponible para este requerimiento.`
+                : `Bus <strong style="color: #ffffff;">${request.ppu || 'S/I'}</strong> &middot; Motivo: <strong style="color: #ffffff;">${motivo}</strong><br />No es posible obtener la grabación solicitada.`}
                             </p>
                         </td>
                     </tr>` : ''}
@@ -199,7 +229,9 @@ export const generateEmailHtml = (request: any) => {
                             <p style="margin-top: 24px; color: #374151; font-size: 15px; line-height: 1.6;">
                                 ${sinDisco
             ? 'Estimados, se informa que el bus asociado a este caso no cuenta con disco duro, por lo que no es posible obtener la grabación solicitada. Se adjuntan los antecedentes para su registro.'
-            : 'Estimados, se adjuntan los antecedentes actualizados de la solicitud de video.'}
+            : motivo
+                ? `Estimados, se informa que no es posible obtener la grabación solicitada. Motivo: ${motivo}. Se adjuntan los antecedentes para su registro.`
+                : 'Estimados, se adjuntan los antecedentes actualizados de la solicitud de video.'}
                             </p>
                         </td>
                     </tr>
@@ -218,7 +250,7 @@ export const generateEmailHtml = (request: any) => {
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f9fafb; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; color: #4b5563; font-size: 12px; font-weight: 700; text-transform: uppercase;">Patente (PPU)</td>
-                                    <td style="background-color: #ffffff; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #1e40af; font-size: 15px; font-weight: 700;">${request.ppu || '—'}${sinDisco ? ` <span style="color: #b91c1c; font-size: 12px; font-weight: 700;">&nbsp;·&nbsp;SIN DISCO DURO</span>` : ''}</td>
+                                    <td style="background-color: #ffffff; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #1e40af; font-size: 15px; font-weight: 700;">${request.ppu || '—'}${motivo ? ` <span style="color: #b91c1c; font-size: 12px; font-weight: 700;">&nbsp;·&nbsp;${sinDisco ? 'SIN DISCO DURO' : motivo.toUpperCase()}</span>` : ''}</td>
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f9fafb; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; color: #4b5563; font-size: 12px; font-weight: 700; text-transform: uppercase;">Ubicación</td>
@@ -251,7 +283,7 @@ export const generateEmailHtml = (request: any) => {
                     <!-- Action Area -->
                     <tr>
                         <td style="padding: 0 40px 40px 40px; text-align: center;">
-                            ${request.video_url ?
+                            ${request.video_url && !motivo ?
             `<!-- Download Button -->
                             <table border="0" cellpadding="0" cellspacing="0" align="center">
                                 <tr>

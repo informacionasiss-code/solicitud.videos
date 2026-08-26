@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dialog"
 import { format } from "date-fns"
 import { RequestForm } from "@/components/forms/RequestForm"
-import { RequestFormValues, vacioANulo } from "@/lib/schemas"
+import { RequestFormValues, vacioANulo, esFallaRegistrada, etiquetaFalla } from "@/lib/schemas"
 import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
@@ -34,14 +34,20 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
             }
 
             const sinDisco = Boolean(values.sin_disco)
+            const tipoFalla = vacioANulo(values.failure_type)
+            // Cualquier tipo de falla cierra el caso: sobreescrito, disco
+            // dañado, error de lectura o no disponible dejan lo mismo que la
+            // falta de disco, que no habrá grabación.
+            const hayFalla = sinDisco || esFallaRegistrada(tipoFalla)
             const ppu = normalizePpu(values.ppu)
-            // Sin disco no hay video posible: se descarta cualquier URL previa
-            // para que el correo no ofrezca una descarga inexistente.
-            const videoUrl = sinDisco ? null : (values.video_url || null)
+            // Con una falla registrada se descarta cualquier URL previa, para
+            // que el correo no ofrezca una descarga inexistente.
+            const videoUrl = hayFalla ? null : (values.video_url || null)
 
             // Auto-update status logic
             let newStatus = request.status;
-            if (sinDisco) {
+            if (hayFalla) {
+                // Nada que revisar: el caso queda listo para responder.
                 if (request.status !== 'enviado') newStatus = 'pendiente_envio';
             } else if (videoUrl && videoUrl !== request.video_url) {
                 if (['pendiente', 'en_revision'].includes(request.status)) {
@@ -65,7 +71,7 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
                     // Estos campos existían en el formulario pero no se
                     // guardaban; sin ellos la falla y las observaciones se
                     // perdían al editar.
-                    failure_type: sinDisco ? 'bus_sin_disco' : (vacioANulo(values.failure_type) || null),
+                    failure_type: sinDisco ? 'bus_sin_disco' : (tipoFalla || null),
                     obs: vacioANulo(values.obs) || null,
                     fleet_status: vacioANulo(values.fleet_status) || request.fleet_status || 'desconocido',
                     sin_disco: sinDisco,
@@ -96,6 +102,11 @@ export function RequestModal({ isOpen, onClose, request, onSuccess }: RequestMod
                 } else {
                     toast.error(`⚠️ ${envio.mensaje}`, { id: "envio-auto", duration: 12000 })
                 }
+            } else if (hayFalla && request.status !== 'enviado') {
+                toast.success(
+                    `Caso cerrado como «${etiquetaFalla(tipoFalla) || 'falla registrada'}». Pasó a Pendiente de Envío.`,
+                    { duration: 7000 }
+                )
             } else {
                 toast.success("Solicitud actualizada")
             }
