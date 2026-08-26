@@ -98,6 +98,55 @@ async function traerPadron(ppus: string[]): Promise<Map<string, FlotaRow>> {
     return mapa;
 }
 
+/**
+ * Trae de `bus_failures` las PPU con un reporte de "bus sin disco".
+ *
+ * Es la sección de Buses Sin Disco de la aplicación: ahí se registran los buses
+ * que no tienen disco instalado, y ese registro es anterior al padrón. Cruzar
+ * sólo contra `padron_flota` ignoraba toda esa información y dejaba sin marcar
+ * buses que el sistema ya sabía que no tienen disco.
+ *
+ * No lanza: si la tabla no se puede leer, se sigue con lo que diga el padrón.
+ */
+async function traerReportesSinDisco(ppus: string[]): Promise<Set<string>> {
+    const unicas = Array.from(new Set(ppus.filter(Boolean)));
+    const reportadas = new Set<string>();
+    const TAMANO = 200;
+
+    for (let i = 0; i < unicas.length; i += TAMANO) {
+        const tanda = unicas.slice(i, i + TAMANO);
+        const { data, error } = await supabase
+            .from("bus_failures")
+            .select("ppu")
+            .eq("failure_type", "bus_sin_disco")
+            .in("ppu", tanda);
+
+        if (error) {
+            console.error("[IMPUGNACION] Error consultando los reportes sin disco:", error);
+            continue;
+        }
+        for (const fila of (data || []) as { ppu: string }[]) {
+            reportadas.add(normalizePpu(fila.ppu));
+        }
+    }
+
+    return reportadas;
+}
+
+/**
+ * Decide si un bus tiene disco, con la MISMA regla que usa el registro de
+ * solicitudes: el padrón manda cuando afirma que no lo tiene, y un reporte
+ * previo sigue valiendo en los demás casos.
+ *
+ * Tenerla en una sola función evita que las dos pantallas contesten distinto
+ * sobre el mismo bus, que es exactamente lo que había pasado.
+ */
+function evaluarDisco(bus: FlotaRow | undefined, tieneReporte: boolean): boolean {
+    if (!bus) return false;                    // no es nuestro: no aplica
+    if (bus.tiene_disco === false) return true; // el padrón lo afirma
+    return tieneReporte;                        // respaldo del historial
+}
+
 export interface ResumenCruce {
     total: number;
     enFlota: number;
@@ -117,13 +166,18 @@ export async function cargarLote(
 ): Promise<{ loteId: string; resumen: ResumenCruce }> {
     if (filas.length === 0) throw new Error("El archivo no contiene filas utilizables.");
 
-    const padron = await traerPadron(filas.map((f) => f.ppu));
+    const ppus = filas.map((f) => f.ppu);
+    const [padron, reportadas] = await Promise.all([
+        traerPadron(ppus),
+        traerReportesSinDisco(ppus),
+    ]);
     const loteId = crypto.randomUUID();
 
     const registros = filas.map((f, i) => {
-        const bus = padron.get(normalizePpu(f.ppu));
+        const normalizada = normalizePpu(f.ppu);
+        const bus = padron.get(normalizada);
         const enFlota = Boolean(bus);
-        const sinDisco = enFlota && bus!.tiene_disco === false;
+        const sinDisco = evaluarDisco(bus, reportadas.has(normalizada));
 
         return {
             lote_id: loteId,
@@ -192,13 +246,18 @@ export async function recruzarLote(
     const filas = (data || []) as ImpugnacionRow[];
     if (filas.length === 0) throw new Error("El lote no tiene filas.");
 
-    const padron = await traerPadron(filas.map((f) => f.ppu));
+    const ppusLote = filas.map((f) => f.ppu);
+    const [padron, reportadas] = await Promise.all([
+        traerPadron(ppusLote),
+        traerReportesSinDisco(ppusLote),
+    ]);
     let cambiados = 0;
 
     for (const fila of filas) {
-        const bus = padron.get(normalizePpu(fila.ppu));
+        const normalizada = normalizePpu(fila.ppu);
+        const bus = padron.get(normalizada);
         const enFlota = Boolean(bus);
-        const sinDisco = enFlota && bus!.tiene_disco === false;
+        const sinDisco = evaluarDisco(bus, reportadas.has(normalizada));
         const interno = bus?.interno || null;
 
         const obsEsperada = esObsAutomatica(fila.obs)
@@ -248,8 +307,9 @@ export async function recruzarLote(
 
     // Recuento sobre el estado nuevo, no sobre el que traían las filas.
     const recalculadas = filas.map((f) => {
-        const bus = padron.get(normalizePpu(f.ppu));
-        return { enFlota: Boolean(bus), sinDisco: Boolean(bus) && bus!.tiene_disco === false };
+        const normalizada = normalizePpu(f.ppu);
+        const bus = padron.get(normalizada);
+        return { enFlota: Boolean(bus), sinDisco: evaluarDisco(bus, reportadas.has(normalizada)) };
     });
 
     return {

@@ -271,3 +271,36 @@ export const FLEET_UNKNOWN_MESSAGES: Record<FleetUnknownReason, string> = {
         "El padrón de flota está vacío. Carga las PPUs de la flota para activar la verificación.",
     error_consulta: "No se pudo verificar la PPU contra el padrón. Revisa la conexión.",
 };
+
+/**
+ * Todas las PPU que hoy se sabe que no tienen disco duro.
+ *
+ * Reúne las dos fuentes: la ficha del padrón y los reportes de la sección
+ * Buses Sin Disco. Sirve para filtrar listados con el conocimiento actual en
+ * lugar de con la marca que quedó guardada en cada registro, que puede ser
+ * anterior a que se supiera del problema.
+ *
+ * No lanza: si una fuente falla, devuelve lo que haya podido reunir de la otra.
+ */
+export async function traerPpusSinDisco(): Promise<Set<string>> {
+    const sinDisco = new Set<string>();
+
+    const [padron, reportes] = await Promise.all([
+        supabase.from(TABLA_PADRON).select("ppu").eq("tiene_disco", false),
+        supabase.from("bus_failures").select("ppu").eq("failure_type", "bus_sin_disco"),
+    ]);
+
+    if (padron.error) {
+        console.error("[FLOTA] No se pudo leer el padrón para el filtro sin disco:", padron.error);
+    } else {
+        for (const f of (padron.data || []) as { ppu: string }[]) sinDisco.add(normalizePpu(f.ppu));
+    }
+
+    if (reportes.error) {
+        console.error("[FLOTA] No se pudieron leer los reportes sin disco:", reportes.error);
+    } else {
+        for (const f of (reportes.data || []) as { ppu: string }[]) sinDisco.add(normalizePpu(f.ppu));
+    }
+
+    return sinDisco;
+}

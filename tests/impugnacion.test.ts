@@ -17,7 +17,24 @@ const insertados: Record<string, unknown>[] = [];
 const updates: Record<string, unknown>[] = [];
 let filasLote: Record<string, unknown>[] = [];
 
+// Buses registrados en la sección "Buses Sin Disco" (tabla bus_failures).
+// SKPL36 está ahí y NO en el padrón como sin disco: es justo el caso que el
+// cruce ignoraba.
+let REPORTES_SIN_DISCO: string[] = ["SKPL36"];
+
 (supabase as { from: unknown }).from = (tabla: string) => {
+    if (tabla === "bus_failures") {
+        const q: Record<string, unknown> = {
+            select: () => q,
+            eq: () => q,
+            in: (_c: string, v: string[]) =>
+                Promise.resolve({
+                    data: REPORTES_SIN_DISCO.filter(p => v.includes(p)).map(ppu => ({ ppu })),
+                    error: null,
+                }),
+        };
+        return q;
+    }
     if (tabla === "padron_flota") {
         const q: Record<string, unknown> = {
             select: () => q,
@@ -62,9 +79,18 @@ ok("  con estado sin_disco", porPpu["LXWP77"].estado === "sin_disco", porPpu["LX
 ok("  y la observación puesta", porPpu["LXWP77"].obs === OBS_SIN_DISCO, porPpu["LXWP77"].obs);
 ok("un bus con disco no recibe observación inventada", porPpu["SKPK27"].obs === null, porPpu["SKPK27"].obs);
 ok("la patente ausente del padrón queda fuera de flota", porPpu["SPCG80"].en_flota === false, porPpu["SPCG80"]);
+
+// El caso que el cruce ignoraba: el bus figura CON disco en el padrón, pero
+// está registrado en la sección Buses Sin Disco.
+ok("un bus reportado en Buses Sin Disco se marca sin disco",
+   porPpu["SKPL36"].sin_disco === true, porPpu["SKPL36"]);
+ok("  y recibe la observación", porPpu["SKPL36"].obs === OBS_SIN_DISCO, porPpu["SKPL36"].obs);
+ok("  con estado sin_disco", porPpu["SKPL36"].estado === "sin_disco", porPpu["SKPL36"].estado);
 ok("el resumen cuenta 3 de nuestra flota", resumen.enFlota === 3, resumen);
 ok("el resumen cuenta 1 fuera", resumen.fueraDeFlota === 1, resumen);
-ok("el resumen cuenta 1 sin disco", resumen.sinDisco === 1, resumen);
+ok("el resumen cuenta los 2 sin disco (padrón + reporte)", resumen.sinDisco === 2, resumen);
+ok("un bus ajeno reportado NO se marca como nuestro",
+   porPpu["SPCG80"].en_flota === false && porPpu["SPCG80"].sin_disco === false, porPpu["SPCG80"]);
 ok("todas las filas comparten el identificador de lote",
    new Set(insertados.map(r => r.lote_id)).size === 1, insertados.map(r => r.lote_id));
 ok("la observación es el aviso estándar", OBS_SIN_DISCO === "BUS NO TIENE DISCO PARA SU REVISION", OBS_SIN_DISCO);

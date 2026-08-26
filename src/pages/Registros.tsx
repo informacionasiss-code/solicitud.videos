@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { esBusSinDisco } from "@/lib/email";
-import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
+import { SIN_DISCO_MENSAJE, normalizePpu, traerPpusSinDisco } from "@/lib/fleet";
 import { DataTable } from "@/components/tables/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
@@ -110,6 +110,15 @@ export default function Registros() {
                 solicitudes = fallback.data || [];
             }
 
+            // Conjunto vigente de buses sin disco, reuniendo el padrón y la
+            // sección de Buses Sin Disco. Se filtra con esto y no sólo con la
+            // marca guardada en cada registro: una solicitud creada antes de
+            // saberse el problema la tiene en false, y el inspector acabaría
+            // yendo igual a un bus del que no hay nada que sacar.
+            const sinDiscoVigente = await traerPpusSinDisco();
+            const tieneDisco = (p: { ppu?: string | null }) =>
+                !sinDiscoVigente.has(normalizePpu(p.ppu));
+
             // --- Requerimientos de impugnación pendientes ---
             // Sólo buses de nuestra flota, sin video todavía y con disco. Si la
             // tabla aún no existe, el PDF sale igual con una sola sección en
@@ -128,6 +137,9 @@ export default function Registros() {
             } else {
                 impugnaciones = consultaImpugnaciones.data || [];
             }
+
+            solicitudes = solicitudes.filter(tieneDisco);
+            impugnaciones = impugnaciones.filter(tieneDisco);
 
             if (solicitudes.length === 0 && impugnaciones.length === 0) {
                 toast.error('No hay patentes pendientes de extracción');
