@@ -47,6 +47,8 @@ export async function enviarSolicitudSinDisco(
             .update({
                 status: "enviado",
                 sent_at: new Date().toISOString(),
+                send_count: ((solicitud.send_count as number | undefined) ?? 0) + 1,
+                reopened_at: null,
                 updated_at: new Date().toISOString(),
             })
             .eq("id", solicitud.id);
@@ -112,3 +114,82 @@ export async function marcarYEnviarSinDisco(
         return { enviado: false, mensaje: "Error inesperado al marcar y enviar la solicitud." };
     }
 }
+
+// ============================================================================
+// Reenvío
+// ============================================================================
+
+/**
+ * Devuelve una solicitud ya enviada a la cola de envíos.
+ *
+ * Sirve para los casos que salieron con datos mal configurados. No se borra
+ * `sent_at`: el caso sí se envió, y perder ese dato impediría reconstruir lo
+ * que pasó. Se marca cuándo se reabrió, y `send_count` deja ver que el próximo
+ * correo será un reenvío y no un caso nuevo.
+ */
+export async function reabrirParaEnvio(
+    id: string
+): Promise<{ ok: boolean; mensaje: string }> {
+    if (!id) return { ok: false, mensaje: "Falta el identificador de la solicitud." };
+
+    try {
+        const { data, error } = await supabase
+            .from("solicitudes")
+            .update({
+                status: "pendiente_envio",
+                reopened_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", id)
+            .select("case_number");
+
+        if (error) {
+            console.error("[REENVIO] No se pudo reabrir la solicitud:", error);
+            return { ok: false, mensaje: `No se pudo reabrir: ${error.message}` };
+        }
+        if (!data || data.length === 0) {
+            return { ok: false, mensaje: "La solicitud ya no existe." };
+        }
+
+        return {
+            ok: true,
+            mensaje: `Caso ${data[0].case_number} devuelto a Pendiente de Envío.`,
+        };
+    } catch (e) {
+        console.error("[REENVIO] Excepción reabriendo la solicitud:", e);
+        return { ok: false, mensaje: "Error inesperado al reabrir la solicitud." };
+    }
+}
+
+/**
+ * Deja la solicitud como enviada, contando el envío.
+ *
+ * Centraliza lo que hay que escribir al despachar para que el envío automático,
+ * el manual y el reenvío no acaben registrando cosas distintas.
+ */
+export async function registrarEnvio(
+    id: string,
+    envíosPrevios: number | null | undefined
+): Promise<{ ok: boolean; mensaje: string }> {
+    const { error } = await supabase
+        .from("solicitudes")
+        .update({
+            status: "enviado",
+            sent_at: new Date().toISOString(),
+            send_count: (envíosPrevios ?? 0) + 1,
+            // El caso deja de estar reabierto: ya se respondió.
+            reopened_at: null,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+    if (error) {
+        console.error("[ENVIO] No se pudo marcar como enviado:", error);
+        return { ok: false, mensaje: error.message };
+    }
+    return { ok: true, mensaje: "Marcado como enviado." };
+}
+
+/** ¿El próximo correo de esta solicitud es un reenvío? */
+export const esReenvio = (solicitud: { send_count?: number | null } | null | undefined): boolean =>
+    (solicitud?.send_count ?? 0) > 0;

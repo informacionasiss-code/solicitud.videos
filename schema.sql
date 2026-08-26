@@ -28,7 +28,12 @@ create table solicitudes (
   fleet_status text check (fleet_status in ('en_flota', 'fuera_de_flota', 'desconocido')) default 'desconocido',
   -- El bus no tiene disco duro: no hay grabación posible
   sin_disco boolean not null default false,
-  sin_disco_source text check (sin_disco_source in ('flota', 'bus_failures', 'manual'))
+  sin_disco_source text check (sin_disco_source in ('flota', 'bus_failures', 'manual')),
+
+  -- Reenvío: momento en que el caso se devolvió a la cola y cuántas veces se
+  -- ha enviado. `sent_at` sigue guardando el último envío.
+  reopened_at timestamptz,
+  send_count integer not null default 0
 );
 
 create index if not exists solicitudes_sin_disco_idx on solicitudes (sin_disco) where sin_disco = true;

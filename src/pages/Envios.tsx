@@ -4,11 +4,12 @@ import { DataTable } from "@/components/tables/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Send, CheckCircle, Mail, Sparkles, HardDrive } from "lucide-react";
+import { Send, CheckCircle, Mail, Sparkles, HardDrive, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { EmailDrawer } from "@/components/drawers/EmailDrawer";
 import { esBusSinDisco, tieneFallaRegistrada, motivoSinVideo } from "@/lib/email";
+import { registrarEnvio, esReenvio } from "@/lib/envioAutomatico";
 import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
 
 export default function Envios() {
@@ -21,10 +22,14 @@ export default function Envios() {
             // que tienen una falla registrada. Antes sólo entraban los buses
             // sin disco, de modo que un caso cerrado por video sobreescrito o
             // disco dañado no aparecía en ninguna parte y no se podía responder.
+            // `status.eq.pendiente_envio` cierra el caso del reenvío: una
+            // solicitud reabierta a mano puede no tener video ni falla, y sin
+            // esta condición volvería a quedarse fuera de la cola, que es
+            // justamente lo que se quiere evitar al reabrirla.
             const { data, error } = await supabase
                 .from('solicitudes')
                 .select('*')
-                .or('video_url.not.is.null,sin_disco.is.true,failure_type.not.is.null')
+                .or('video_url.not.is.null,sin_disco.is.true,failure_type.not.is.null,status.eq.pendiente_envio')
                 .neq('status', 'enviado')
                 .order('updated_at', { ascending: false });
 
@@ -47,19 +52,18 @@ export default function Envios() {
     });
 
     const markAsSent = async (id: string) => {
-        try {
-            const { error } = await supabase.from('solicitudes').update({
-                status: 'enviado',
-                sent_at: new Date().toISOString()
-            }).eq('id', id);
-
-            if (error) throw error;
-            toast.success("Marcado como enviado");
-            setPreviewRequest(null);
-            refetch();
-        } catch (e: any) {
-            toast.error(e.message);
+        // El contador se lee de la fila que ya está en pantalla: así un reenvío
+        // queda registrado como tal en lugar de contarse como primer envío.
+        const fila = (data as { id: string; send_count?: number }[] | undefined)
+            ?.find((r) => r.id === id);
+        const r = await registrarEnvio(id, fila?.send_count);
+        if (!r.ok) {
+            toast.error(r.mensaje);
+            return;
         }
+        toast.success("Marcado como enviado");
+        setPreviewRequest(null);
+        refetch();
     };
 
     const columns: ColumnDef<any>[] = [
@@ -71,7 +75,18 @@ export default function Envios() {
                     <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
                         #{row.getValue("case_number")?.toString().slice(-3) || "—"}
                     </div>
-                    <span className="font-semibold text-slate-900">#{row.getValue("case_number")}</span>
+                    <div className="min-w-0">
+                        <span className="font-semibold text-slate-900">#{row.getValue("case_number")}</span>
+                        {esReenvio(row.original) && (
+                            <span
+                                className="ml-2 inline-flex items-center gap-1 rounded-full border border-violet-300 bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-700"
+                                title="Este caso ya se envió antes y fue devuelto a la cola"
+                            >
+                                <RotateCcw className="h-2.5 w-2.5" />
+                                Reenvío
+                            </span>
+                        )}
+                    </div>
                 </div>
             ),
         },

@@ -1,7 +1,7 @@
 import { X, Mail, Copy, CheckCircle, FileText, Clipboard, Loader2, Send, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { generateEmailBody, subjectForRequest, esBusSinDisco, EMAIL_CONFIG, sendEmailViaResend } from "@/lib/email";
+import { generateEmailBody, subjectForRequest, esBusSinDisco, esCorreoDeReenvio, EMAIL_CONFIG, sendEmailViaResend } from "@/lib/email";
 import { SIN_DISCO_MENSAJE } from "@/lib/fleet";
 import { toast } from "sonner";
 import { useCallback, useState, useEffect } from "react";
@@ -158,6 +158,19 @@ export function EmailDrawer({ isOpen, onClose, request, onMarkSent }: EmailDrawe
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+
+                    {/* Reenvío: el operador debe saberlo antes de despachar */}
+                    {esCorreoDeReenvio(request) && (
+                        <div className="rounded-lg border-2 border-violet-400 bg-violet-50 p-4">
+                            <p className="text-sm font-extrabold uppercase tracking-wide text-violet-700">
+                                Reenvío — envío nº {(request?.send_count ?? 0) + 1}
+                            </p>
+                            <p className="mt-1 text-xs text-violet-700">
+                                Este caso ya se envió antes y fue devuelto a la cola. El correo
+                                incluirá un aviso indicando que corrige el envío anterior.
+                            </p>
+                        </div>
+                    )}
 
                     {/* Aviso de bus sin disco: se ve antes de pulsar enviar */}
                     {esBusSinDisco(request) && (

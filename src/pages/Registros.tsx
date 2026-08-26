@@ -2,13 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { esBusSinDisco } from "@/lib/email";
 import { SIN_DISCO_MENSAJE, normalizePpu, traerPpusSinDisco } from "@/lib/fleet";
+import { reabrirParaEnvio } from "@/lib/envioAutomatico";
 import { DataTable } from "@/components/tables/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, Video, Trash2, Filter, Search, Download, RefreshCw, CheckSquare, FileText } from "lucide-react";
+import { Eye, Video, Trash2, Filter, Search, Download, RefreshCw, CheckSquare, FileText, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -73,6 +74,34 @@ export default function Registros() {
         } catch (error: any) {
             toast.error("Error: " + error.message);
         }
+    };
+
+    /**
+     * Devuelve un caso ya enviado a la cola de envíos.
+     *
+     * El estado 'enviado' lo saca de esa cola, de modo que un correo despachado
+     * con datos mal configurados quedaba cerrado sin vuelta atrás. No se borra
+     * `sent_at`: el envío ocurrió, y lo que interesa es poder verlo junto al
+     * hecho de que después se reabrió.
+     */
+    const handleReabrir = async (solicitud: { id: string; case_number: string; send_count?: number | null }) => {
+        const veces = solicitud.send_count ?? 0;
+        const aviso = veces > 1
+            ? `\n\nEste caso ya se ha enviado ${veces} veces.`
+            : '';
+        if (!confirm(
+            `¿Devolver el caso ${solicitud.case_number} a Pendiente de Envío?\n\n` +
+            `Volverá a aparecer en Envíos para corregirlo y mandarlo de nuevo. ` +
+            `El correo saldrá marcado como reenvío.${aviso}`
+        )) return;
+
+        const r = await reabrirParaEnvio(solicitud.id);
+        if (!r.ok) {
+            toast.error(r.mensaje);
+            return;
+        }
+        toast.success(r.mensaje, { duration: 7000 });
+        refetch();
     };
 
     const handleExport = () => {
@@ -241,10 +270,28 @@ export default function Registros() {
             header: "Estado",
             cell: ({ row }) => {
                 const status = row.getValue("status") as keyof typeof STATUS_LABELS;
+                const veces = row.original.send_count ?? 0;
+                const reabierto = Boolean(row.original.reopened_at);
                 return (
-                    <Badge className={`${getStatusColor(status)} border font-medium`}>
-                        {STATUS_LABELS[status]}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-1">
+                        <Badge className={`${getStatusColor(status)} border font-medium`}>
+                            {STATUS_LABELS[status]}
+                        </Badge>
+                        {/* Un caso reabierto o enviado más de una vez conviene
+                            distinguirlo: explica por qué vuelve a estar en la cola. */}
+                        {(reabierto || veces > 1) && (
+                            <Badge
+                                className="border border-violet-300 bg-violet-100 text-violet-700 font-medium"
+                                title={
+                                    reabierto
+                                        ? "Devuelto a la cola de envíos para corregirlo"
+                                        : `Se ha enviado ${veces} veces`
+                                }
+                            >
+                                {reabierto ? "Reabierto" : `${veces}º envío`}
+                            </Badge>
+                        )}
+                    </div>
                 );
             },
         },
@@ -290,6 +337,17 @@ export default function Registros() {
                         >
                             <Eye className="h-4 w-4 text-slate-500 hover:text-blue-600 dark:text-slate-400" />
                         </Button>
+                        {row.original.status === 'enviado' && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleReabrir(row.original)}
+                                title="Volver a enviar: devuelve el caso a Pendiente de Envío"
+                                className="hover:bg-violet-50 dark:hover:bg-violet-900/30"
+                            >
+                                <Undo2 className="h-4 w-4 text-slate-500 hover:text-violet-600 dark:text-slate-400" />
+                            </Button>
+                        )}
                         <Button
                             variant="ghost"
                             size="icon"

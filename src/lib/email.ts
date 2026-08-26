@@ -6,7 +6,21 @@ interface SolicitudDiscoFields {
     sin_disco?: boolean | null;
     failure_type?: string | null;
     case_number?: string | null;
+    send_count?: number | null;
 }
+
+/**
+ * ¿Este correo corrige uno anterior del mismo caso?
+ *
+ * Se declara aquí y no se importa del módulo de envíos para no crear una
+ * dependencia circular entre ambos.
+ *
+ * Importa decirlo: sin esa marca, el destinatario recibe dos correos del mismo
+ * número de caso y no tiene forma de saber cuál vale.
+ */
+export const esCorreoDeReenvio = (
+    request: SolicitudDiscoFields | null | undefined
+): boolean => (request?.send_count ?? 0) > 0;
 
 /**
  * ¿Esta solicitud corresponde a un bus sin disco duro?
@@ -61,6 +75,12 @@ export const generateEmailBody = (request: any) => {
     // motivo. Prometer un video que no va a llegar obliga al destinatario a
     // volver a preguntar.
     const motivo = motivoSinVideo(request);
+    const reenvio = esCorreoDeReenvio(request)
+        ? `[ REENVIO ] Este mensaje corrige el envio anterior de este mismo caso.
+Considerar valida esta version y descartar la previa.
+
+`
+        : '';
 
     // El aviso encabeza el cuerpo: es la conclusión del caso, no una nota al pie.
     const encabezado = sinDisco
@@ -84,7 +104,7 @@ No es posible obtener la grabación solicitada para el bus ${request.ppu || 'S/I
 
     return `Estimados,
 
-${encabezado}Junto con saludar, envío antecedentes para extracción de video:
+${reenvio}${encabezado}Junto con saludar, envío antecedentes para extracción de video:
 
 Caso: ${request.case_number}
 PPU: ${request.ppu}
@@ -108,6 +128,7 @@ Saludos cordiales.
 export const generateEmailHtml = (request: any) => {
     const sinDisco = esBusSinDisco(request);
     const motivo = motivoSinVideo(request);
+    const reenvio = esCorreoDeReenvio(request);
 
     // Safe Date Parsing
     let incidentDate = 'N/A';
@@ -195,6 +216,19 @@ export const generateEmailHtml = (request: any) => {
                             <p style="margin: 8px 0 0 0; color: #bfdbfe; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">Gestión de Evidencia Digital</p>
                         </td>
                     </tr>
+
+                    ${reenvio ? `
+                    <!-- Corrige un envío anterior del mismo caso -->
+                    <tr>
+                        <td style="background-color: #ede9fe; border-bottom: 1px solid #ddd6fe; padding: 14px 40px; text-align: center;">
+                            <p style="margin: 0; color: #5b21b6; font-size: 13px; font-weight: 700; letter-spacing: 0.5px; font-family: Helvetica, Arial, sans-serif;">
+                                REENVÍO &middot; Este mensaje corrige el envío anterior de este caso
+                            </p>
+                            <p style="margin: 6px 0 0 0; color: #6d28d9; font-size: 12px; font-family: Helvetica, Arial, sans-serif;">
+                                Considerar válida esta versión y descartar la previa.
+                            </p>
+                        </td>
+                    </tr>` : ''}
 
                     ${motivo ? `
                     <!-- Aviso principal: no habrá grabación, y por qué -->
