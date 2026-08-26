@@ -137,6 +137,21 @@ create policy "Allow public insert bus_failures"
   to anon
   with check (true);
 
+-- Sin estas dos, un bus mal reportado quedaría marcado sin disco para siempre:
+-- la aplicación podría añadirlo pero no corregirlo.
+create policy "Allow public update bus_failures"
+  on bus_failures for update
+  to anon
+  using (true);
+
+create policy "Allow public delete bus_failures"
+  on bus_failures for delete
+  to anon
+  using (true);
+
+create index if not exists bus_failures_ppu_idx on bus_failures (ppu);
+create index if not exists bus_failures_tipo_ppu_idx on bus_failures (failure_type, ppu);
+
 -- Impugnaciones: requerimientos cargados desde archivo, cruzados con el padrón
 create table impugnaciones (
   id uuid default uuid_generate_v4() primary key,

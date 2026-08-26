@@ -304,3 +304,97 @@ export async function traerPpusSinDisco(): Promise<Set<string>> {
 
     return sinDisco;
 }
+
+/** De dónde viene la marca de "sin disco" de un bus. */
+export interface OrigenSinDisco {
+    /** La ficha del padrón dice tiene_disco = false. */
+    padron: boolean;
+    /** Hay al menos un reporte en la sección Buses Sin Disco. */
+    reporte: boolean;
+}
+
+/**
+ * Quita a un bus de la lista de "sin disco", en TODAS sus fuentes.
+ *
+ * Corregir sólo la ficha del padrón no bastaba: el cruce usa los reportes de
+ * `bus_failures` como respaldo, así que un reporte antiguo seguía marcando el
+ * bus aunque su ficha dijera que sí tiene disco. Por eso esta operación toca
+ * las dos y no una.
+ *
+ * Devuelve qué se corrigió, para poder decírselo al usuario en lugar de dar por
+ * hecho que todo salió bien.
+ */
+export async function quitarDeSinDisco(rawPpu: string): Promise<{
+    ppu: string;
+    padronActualizado: boolean;
+    reportesEliminados: number;
+    errores: string[];
+}> {
+    const ppu = normalizePpu(rawPpu);
+    const errores: string[] = [];
+    let padronActualizado = false;
+    let reportesEliminados = 0;
+
+    if (!ppu) return { ppu, padronActualizado, reportesEliminados, errores: ["PPU vacía."] };
+
+    // 1. La ficha del padrón pasa a decir que sí tiene disco.
+    const { data: actualizado, error: errPadron } = await supabase
+        .from(TABLA_PADRON)
+        .update({ tiene_disco: true, notas: null, updated_at: new Date().toISOString() })
+        .eq("ppu", ppu)
+        .select("id");
+
+    if (errPadron) {
+        console.error("[FLOTA] No se pudo actualizar el padrón:", errPadron);
+        errores.push(`Padrón: ${errPadron.message}`);
+    } else {
+        padronActualizado = (actualizado?.length ?? 0) > 0;
+    }
+
+    // 2. Se eliminan los reportes de "sin disco" de ese bus. Sólo los de ese
+    //    tipo: otras fallas del mismo bus son información distinta y se quedan.
+    const { data: borrados, error: errReportes } = await supabase
+        .from("bus_failures")
+        .delete()
+        .eq("ppu", ppu)
+        .eq("failure_type", "bus_sin_disco")
+        .select("id");
+
+    if (errReportes) {
+        console.error("[FLOTA] No se pudieron eliminar los reportes:", errReportes);
+        errores.push(`Reportes: ${errReportes.message}`);
+    } else {
+        reportesEliminados = borrados?.length ?? 0;
+    }
+
+    invalidateFleetCache();
+    return { ppu, padronActualizado, reportesEliminados, errores };
+}
+
+/**
+ * Marca un bus del padrón como sin disco duro.
+ *
+ * Actualiza la ficha; no crea buses ni acumula reportes repetidos.
+ */
+export async function marcarSinDisco(rawPpu: string): Promise<FlotaRow> {
+    const ppu = normalizePpu(rawPpu);
+    if (!ppu) throw new Error("PPU vacía.");
+
+    const { data, error } = await supabase
+        .from(TABLA_PADRON)
+        .update({
+            tiene_disco: false,
+            notas: "Sin disco duro instalado",
+            updated_at: new Date().toISOString(),
+        })
+        .eq("ppu", ppu)
+        .select();
+
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) {
+        throw new Error(`La PPU ${ppu} no está en el padrón de flota.`);
+    }
+
+    invalidateFleetCache();
+    return data[0] as FlotaRow;
+}
