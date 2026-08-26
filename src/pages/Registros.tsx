@@ -84,36 +84,61 @@ export default function Registros() {
 
     const handleDownloadPendingPDF = async () => {
         try {
-            // Fetch only pending items (status pendiente AND no video)
-            // Los buses sin disco no están pendientes de extracción: no hay
-            // nada que extraer, así que no deben viajar en este listado.
-            const withFleet = await supabase
+            // --- Solicitudes de video pendientes de extracción ---
+            // Un bus sin disco no está pendiente: no hay nada que extraer.
+            const consultaSolicitudes = await supabase
                 .from('solicitudes')
-                .select('ppu, case_number, incident_at')
+                .select('ppu, case_number, incident_at, sin_disco')
                 .is('video_url', null)
                 .eq('sin_disco', false)
                 .order('ppu', { ascending: true });
 
-            let pendingData = withFleet.data;
+            // El fallback no puede pedir `sin_disco` -es justo la columna que
+            // falta cuando la migración no está aplicada-, así que el tipo se
+            // declara con esa columna opcional.
+            let solicitudes: { ppu: string; case_number?: string; incident_at?: string; sin_disco?: boolean | null }[] =
+                consultaSolicitudes.data || [];
 
-            if (withFleet.error) {
-                console.warn('[REGISTROS] Filtro sin_disco no disponible, usando fallback:', withFleet.error);
+            if (consultaSolicitudes.error) {
+                console.warn('[REGISTROS] Filtro sin_disco no disponible, usando fallback:', consultaSolicitudes.error);
                 const fallback = await supabase
                     .from('solicitudes')
                     .select('ppu, case_number, incident_at')
                     .is('video_url', null)
                     .order('ppu', { ascending: true });
                 if (fallback.error) throw fallback.error;
-                pendingData = fallback.data;
+                solicitudes = fallback.data || [];
             }
 
-            if (!pendingData || pendingData.length === 0) {
+            // --- Requerimientos de impugnación pendientes ---
+            // Sólo buses de nuestra flota, sin video todavía y con disco. Si la
+            // tabla aún no existe, el PDF sale igual con una sola sección en
+            // lugar de fallar entero.
+            let impugnaciones: { ppu: string; sin_disco?: boolean | null }[] = [];
+            const consultaImpugnaciones = await supabase
+                .from('impugnaciones')
+                .select('ppu, sin_disco')
+                .eq('en_flota', true)
+                .eq('sin_disco', false)
+                .is('video_url', null)
+                .order('ppu', { ascending: true });
+
+            if (consultaImpugnaciones.error) {
+                console.warn('[REGISTROS] No se pudieron leer las impugnaciones:', consultaImpugnaciones.error);
+            } else {
+                impugnaciones = consultaImpugnaciones.data || [];
+            }
+
+            if (solicitudes.length === 0 && impugnaciones.length === 0) {
                 toast.error('No hay patentes pendientes de extracción');
                 return;
             }
 
-            generatePendingPPUsPDF(pendingData);
-            toast.success(`PDF descargado: ${pendingData.length} patentes pendientes`);
+            generatePendingPPUsPDF(solicitudes, impugnaciones);
+
+            const partes = [`${solicitudes.length} de solicitudes`];
+            if (impugnaciones.length > 0) partes.push(`${impugnaciones.length} de impugnación`);
+            toast.success(`PDF descargado: ${partes.join(' y ')}`);
         } catch (error: any) {
             toast.error('Error al generar PDF: ' + error.message);
         }
